@@ -41,10 +41,12 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.inspection import PartialDependenceDisplay
 from sklearn.preprocessing import StandardScaler
 import statsmodels.api as sm
+from pathlib import Path                          
+
 
 # ─── Configuration ────────────────────────────────────────────────────────────
-
-OUT_DIR     = r"D:\EAGLE\Zugspitze\UAV_Zugspitze\out"
+HERE        = Path(__file__).resolve().parent
+OUT_DIR     = HERE / "out"
 INDICES_DIR = os.path.join(OUT_DIR, "indices")    # rasters from topo_indices.py
 RESULTS_DIR = os.path.join(OUT_DIR, "analysis")   # plots + CSV from this script
 

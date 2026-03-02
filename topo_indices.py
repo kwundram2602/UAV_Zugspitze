@@ -28,7 +28,6 @@ print(HERE)
 SUMMER_DSM  = HERE / "uas_data" / "2025-08-20" / "2025-08-20_dsm_10cm_32632.tif"
 OUT_DIR     = HERE / "out"
 INDICES_DIR = OUT_DIR / "indices"                 
-breakpoint()  # ← FIX 2: for debugging, can be removed later
 # TPI neighbourhood radii in pixels (10 cm resolution → 1 px = 0.10 m)
 #   50 px  =  5 m   
 #  250 px  = 25 m   
