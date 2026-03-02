@@ -1,1 +1,6 @@
 uas_data
+out
+.vscode
+.venv
+.ruff_cache
+uv.lock
