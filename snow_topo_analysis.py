@@ -7,8 +7,7 @@ Workflow:
   1. Load snow depth model + topographic indices (from topo_indices.py output)
   2. Build a random pixel sample (stratified by snow depth quantile)
   3. Fit Random Forest  → feature importance, partial dependence
-  4. Fit OLS regression → standardised beta coefficients, p-values
-  5. Export plots and a summary CSV
+  4. Export plots and a summary CSV
 
 Prerequisite outputs:
     out/snow_depth_model.tif
@@ -35,13 +34,10 @@ matplotlib.use("Agg")           # headless; change to "TkAgg" if you want a wind
 import matplotlib.pyplot as plt
 
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.inspection import PartialDependenceDisplay
-from sklearn.preprocessing import StandardScaler
-import statsmodels.api as sm
-from pathlib import Path                          
+from pathlib import Path
 
 
 # ─── Configuration ────────────────────────────────────────────────────────────
@@ -119,7 +115,7 @@ print(f"  Valid pixels after filter : {len(df_valid):,}")
 # Stratified sample: equal number of rows per snow-depth decile
 #   → ensures rare deep-snow pixels are represented
 df_valid["_decile"] = pd.qcut(df_valid["snow_depth"], q=10, labels=False, duplicates="drop")
-per_bin = max(1, N_SAMPLE // df_valid["_decile"].nunique())
+per_bin = max(1, N_SAMPLE // df_valid["_decile"].nunique())  # rows to draw per decile
 df_sample = (
     df_valid
     .groupby("_decile", group_keys=False)
@@ -173,53 +169,23 @@ print(f"  Feature importances:")
 for feat, imp in sorted(zip(FEATURES, rf.feature_importances_), key=lambda x: -x[1]):
     print(f"    {feat:20s}: {imp:.4f}")
 
-# ─── 4. OLS regression ────────────────────────────────────────────────────────
-print_section("OLS Regression (standardised predictors)")
-
-scaler    = StandardScaler()
-X_scaled  = scaler.fit_transform(X)
-
-X_tr_sc, X_te_sc, _, _ = train_test_split(
-    X_scaled, y, test_size=0.2, random_state=RANDOM_SEED
-)
-
-# sklearn OLS for metrics
-ols_sk = LinearRegression().fit(X_tr_sc, y_train)
-y_pred_ols = ols_sk.predict(X_te_sc)
-r2_ols   = r2_score(y_test, y_pred_ols)
-mae_ols  = mean_absolute_error(y_test, y_pred_ols)
-rmse_ols = np.sqrt(mean_squared_error(y_test, y_pred_ols))
-
-print(f"  R²   = {r2_ols:.4f}")
-print(f"  MAE  = {mae_ols:.4f} m")
-print(f"  RMSE = {rmse_ols:.4f} m")
-
-# statsmodels OLS for p-values / summary table
-X_sm  = sm.add_constant(pd.DataFrame(X_scaled, columns=FEATURES))
-ols_sm = sm.OLS(y, X_sm).fit()
-print("\nStatsmodels OLS summary:")
-print(ols_sm.summary())
-
-# ─── 5. Summary CSV ───────────────────────────────────────────────────────────
+# ─── 4. Summary CSV ───────────────────────────────────────────────────────────
 summary = pd.DataFrame({
     "feature"      : FEATURES,
     "feature_label": feat_labels,
     "rf_importance": rf.feature_importances_,
-    "ols_beta"     : ols_sk.coef_,
-    "ols_pvalue"   : ols_sm.pvalues[1:].values,
 })
 summary_path = os.path.join(RESULTS_DIR, "snow_topo_summary.csv")
 summary.to_csv(summary_path, index=False)
 print(f"\nSummary table saved → {summary_path}")
 
-# ─── 6. Plots ─────────────────────────────────────────────────────────────────
+# ─── 5. Plots ─────────────────────────────────────────────────────────────────
 print_section("Plotting")
 
-COLORS = {"pos": "#2196F3", "neg": "#F44336"}
 n_feat = len(FEATURES)
 
-# ── 6a. Model summary figure: importances + betas + pred-vs-obs ───────────────
-fig, axes = plt.subplots(1, 3, figsize=(18, max(5, n_feat * 0.5 + 2)))
+# ── 5a. Feature importances + pred-vs-obs ─────────────────────────────────────
+fig, axes = plt.subplots(1, 2, figsize=(12, max(5, n_feat * 0.5 + 2)))
 fig.suptitle(
     "Snow Depth vs. Topographic Parameters – Zugspitze UAV\n"
     f"Summer DSM: 2025-08-20  |  Winter DSM: 2026-01-17  |  "
@@ -230,29 +196,13 @@ fig.suptitle(
 # RF feature importances
 ax = axes[0]
 feat_imp = pd.Series(rf.feature_importances_, index=feat_labels)
-feat_imp.sort_values().plot.barh(ax=ax, color=COLORS["pos"])
+feat_imp.sort_values().plot.barh(ax=ax, color="#2196F3")
 ax.set_title("RF Feature Importances\n(mean decrease in impurity)")
 ax.set_xlabel("Importance")
 ax.axvline(0, color="k", lw=0.5)
 
-# OLS standardised beta coefficients + significance stars
+# Predicted vs observed
 ax = axes[1]
-betas = pd.Series(ols_sk.coef_, index=FEATURES)
-betas_sorted = betas.sort_values()
-bar_colors = [COLORS["pos"] if b >= 0 else COLORS["neg"] for b in betas_sorted]
-betas_sorted.rename(FEATURE_LABELS).plot.barh(ax=ax, color=bar_colors)
-ax.set_title("OLS Standardised β Coefficients")
-ax.set_xlabel("β  (std. units)")
-ax.axvline(0, color="k", lw=0.8)
-for i, raw_feat in enumerate(betas_sorted.index):
-    p   = ols_sm.pvalues[raw_feat]
-    star = "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else "ns"
-    val  = betas_sorted.iloc[i]
-    offset = max(abs(betas_sorted)) * 0.03 * np.sign(val) if val != 0 else 0.002
-    ax.text(val + offset, i, star, va="center", fontsize=8)
-
-# Predicted vs observed (RF)
-ax = axes[2]
 ax.hexbin(y_test, y_pred_rf, gridsize=60, cmap="Blues", mincnt=1)
 lim = [0, max(y_test.max(), y_pred_rf.max())]
 ax.plot(lim, lim, "r--", lw=1.2, label="1:1 line")
@@ -267,7 +217,7 @@ plt.savefig(plot_path, dpi=150, bbox_inches="tight")
 plt.close()
 print(f"  Model summary plot saved → {plot_path}")
 
-# ── 6b. Hexbin scatter: snow depth vs each predictor ─────────────────────────
+# ── 5b. Hexbin scatter: snow depth vs each predictor ─────────────────────────
 n_cols  = 4
 n_rows  = int(np.ceil(n_feat / n_cols))
 fig2, axes2 = plt.subplots(n_rows, n_cols,
@@ -294,7 +244,7 @@ plt.savefig(scatter_path, dpi=150, bbox_inches="tight")
 plt.close()
 print(f"  Scatter grid saved → {scatter_path}")
 
-# ── 6c. Partial dependence plots (RF) ─────────────────────────────────────────
+# ── 5c. Partial dependence plots (RF) ─────────────────────────────────────────
 fig3, axes3 = plt.subplots(n_rows, n_cols,
                             figsize=(n_cols * 4, n_rows * 3.5))
 axes3_flat = axes3.ravel() if n_feat > 1 else [axes3]
@@ -319,6 +269,6 @@ print(f"  Partial dependence plot saved → {pdp_path}")
 # ─── Done ─────────────────────────────────────────────────────────────────────
 print_section("Results summary")
 print(f"  Random Forest R²  = {r2_rf:.4f}")
-print(f"  OLS       R²  = {r2_ols:.4f}")
-print(f"  Most important predictor (RF): {FEATURE_LABELS[FEATURES[np.argmax(rf.feature_importances_)]]}")
+print(f"  RMSE              = {rmse_rf:.4f} m")
+print(f"  Most important predictor: {FEATURE_LABELS[FEATURES[np.argmax(rf.feature_importances_)]]}")
 print(f"\nAll outputs in: {RESULTS_DIR}")
