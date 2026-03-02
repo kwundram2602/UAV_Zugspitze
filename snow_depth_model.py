@@ -21,9 +21,9 @@ rgbs = {}
 snow_m = []
 for date, folder in zip(dates, folders):
     files = os.listdir(folder)
-    dsm_files = [f for f in files if "dsm" in f.lower()]
+    dsm_files = [f for f in files if "dsm" in f.lower() and f.lower().endswith(".tif")]
     dsms[date] = dsm_files
-    rgb_files = [f for f in files if "rgb" in f.lower()]
+    rgb_files = [f for f in files if "rgb" in f.lower() and f.lower().endswith(".tif")]
     rgbs[date] = rgb_files
 
 
