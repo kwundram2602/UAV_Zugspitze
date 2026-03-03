@@ -1,0 +1,145 @@
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage[brazil]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[centertags]{amsmath}
+\usepackage{multirow,multicol}
+%\usepackage{colortbl}
+\usepackage{lipsum} %sugest\~ao de texto
+\usepackage{geometry}
+\usepackage{standalone}
+\usepackage{tikz,pgfplots,tikz-3dplot}
+\usepackage{graphicx,wrapfig}
+\usepackage{physics}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{setspace}
+
+\usetikzlibrary{positioning}
+\usetikzlibrary{arrows.meta}
+\pagestyle{plain}
+
+%%Transformando tudo em branco
+\renewcommand{\thesection}{\textcolor{white}{\arabic{section}}}
+\renewcommand{\thesubsection}{\textcolor{white}{\arabic{section}.\arabic{subsection}}}
+
+%%Definindo cores
+\definecolor{BoxCol}{RGB}{0,60,100} %azul
+%paleta: Citrus Fruits
+%http://www.colourlovers.com/palette/1653416/Citrus_Fruits
+\definecolor{marrom}{RGB}{200,77,0}
+\definecolor{mandarin}{RGB}{246,116,20}
+\definecolor{laranja}{RGB}{244,107,2}
+\definecolor{amarelolimao}{RGB}{252,223,69}
+\definecolor{verde}{RGB}{0,192,0}
+%paleta: Me BEDRUME
+%http://www.colourlovers.com/palette/1653495/Me_BEDRUME
+\definecolor{twoblue}{RGB}{16,126,160} %azul
+\definecolor{greenish}{RGB}{57,202,131} %verde
+\definecolor{rosa}{RGB}{249,177,197} %rosa
+\definecolor{PeachKeen}{RGB}{249,171,104} %laranja
+\definecolor{MandarinSorbet}{RGB}{249,247,119} %amarelo
+%paleta: Teal to Yellow
+%http://www.colourlovers.com/palette/1653453/Teal_to_Yellow
+\definecolor{GreenTedious}{RGB}{0,222,155} %verde
+\definecolor{GreenSublime}{RGB}{97,255,48} %verde
+\definecolor{GreenTeal}{RGB}{148,255,48} %verde
+\definecolor{YellowFishEggs}{RGB}{255,252,48} %amarelo
+\definecolor{OrangeLampLight}{RGB}{255,193,48} %laranja
+\definecolor{white}{RGB}{255,255,255}
+
+%%Define o caminho das figuras, válido somente para o comando \includegraphics
+\graphicspath{{Figures}}
+%********************************************************************
+%%Teoremas
+\usepackage{theorem}
+\theorembodyfont{\normalfont\upshape}
+\newtheorem{ex}{Exemplo}
+\newenvironment{defn}[1][Defini\c{c}\~ao]{\textbf{#1:}\
+}%
+%********************************************************************
+%%Definindo de novos comandos
+
+\newcommand{\tituloA}[1]{\emph{\large \textbf{\color{white}{#1}}}}
+\newcommand{\tituloB}[1]{\emph{\large \textbf{\color{laranja}{#1}}}}
+\newcommand{\R}{\mathbb{R}}
+
+%%Imagem de fundo (background)
+\newcommand{\imgfundo}[1]{
+\begin{tikzpicture}[remember picture,overlay]
+  \tikzset{inner sep=0pt,outer sep=0pt}
+    %%Centralizado na página.
+    \node at (current page.center) {
+      \includegraphics[height=\paperheight]{#1} %%Figura da altura do papel.
+    };
+\end{tikzpicture}
+}
+
+%%titulo feito com TikZ
+\newdimen\altura
+\altura=12cm
+\newcommand{\titulo}[3]{
+\begin{tikzpicture}[remember picture,overlay]
+\node at (current page.north west){
+  \begin{tikzpicture}[remember picture,overlay]
+      \draw[fill=#3] (-3cm,0) rectangle (\paperwidth,-\altura);
+      \node[right] at (-0.8cm,-.65*\altura) {
+	\includegraphics[height=12cm]{#1} %%primeiro logo
+      };
+  \end{tikzpicture}
+};
+\node at (current page.north east){
+  \begin{tikzpicture}[remember picture,overlay]
+  \filldraw[white] (-14.4cm,0) rectangle (0,-1.01*\altura);
+      \node[left] at (-2.9cm,-.61*\altura) {
+	\includegraphics[height=9.5cm]{#2} %%segundo logo
+      };
+      \filldraw[laranja](-15.5cm,0) rectangle (-14.4cm,-\altura);
+      
+  \end{tikzpicture}
+};
+\node at (current page.north){
+  \begin{tikzpicture}[remember picture,overlay,node distance=2mm]
+    \node[white] (n1) at (-1.5,-4) {\shortstack{\Large\textbf{\tituloposter}}};
+    \node[white] (n2) [below = of n1] {\shortstack{\Large\textbf{\titulogrande}}};
+    \node[white] (n3) [below = of n2] {\nome};
+    \node[white] (n4) [below = of n3] {\small{\instituicao}};
+  \end{tikzpicture}
+};
+\end{tikzpicture}
+}
+
+%%Nome do congresso feito com TikZ
+\newcommand{\congresso}[1]{
+\begin{tikzpicture}[remember picture,overlay]
+\node at (current page.north){
+  \begin{tikzpicture}[remember picture,overlay]
+     \draw[fill=#1] (-.5*\textwidth-2cm,-13.25) rectangle (.5*\textwidth-2cm,-14.75);
+     \node[white] at (-2cm,-14) {\Large{
+	\nomecongresso \qquad --- \qquad \textbf{\abrev}
+      }};
+  \end{tikzpicture}
+};
+\end{tikzpicture}
+}
+
+%%rodape feito com TikZ
+\newcommand{\rodape}[3]{
+\begin{tikzpicture}[remember picture,overlay]
+\node at (current page.south west){
+  \begin{tikzpicture}[remember picture,overlay,inner sep=0,outer sep=0]
+      \draw[fill=#3] (0,0) rectangle (\paperwidth,5);
+      \node[above right] at (4cm,1) {
+	\includegraphics[height=3cm]{#1} %%terceiro logo
+      };
+  \end{tikzpicture}
+};
+\node[yshift=2cm,yellow] at (current page.south){\url{http://latexbr.blogspot.com}};
+\node at (current page.south east){
+  \begin{tikzpicture}[remember picture,overlay,inner sep=0,outer sep=0]
+      \node[above left] at (-4cm,1) {
+	\includegraphics[height=3cm]{#2} %%quarto logo
+      };
+  \end{tikzpicture}
+};
+\end{tikzpicture}
+}
