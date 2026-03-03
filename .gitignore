@@ -4,3 +4,4 @@ out
 .venv
 .ruff_cache
 uv.lock
+Poster_UAV/build
