@@ -15,3 +15,6 @@ copy uas_data folder to repo folder
 1. Create Snow Depth Model (SDM)
 2. Create indices
 3. Regression
+
+
+## Test
