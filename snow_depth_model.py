@@ -5,13 +5,16 @@ import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import rioxarray as riox
+from pathlib import Path
 
+HERE        = Path(__file__).resolve().parent
+OUT_DIR     = HERE / "out"
 print(os.getcwd())
 wbe = WbEnvironment()
 wbe.working_directory = os.path.join(os.getcwd(), "uas_data")
 print(wbe.working_directory)
 
-dates = os.listdir("./uas_data/")
+dates = os.listdir(os.path.join(HERE,"uas_data"))
 print(dates)
 folders = [os.path.join(os.getcwd(), "uas_data", date) for date in dates]
 print(folders)
