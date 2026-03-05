@@ -120,7 +120,7 @@ df_sample = (
     df_valid
     .groupby("_decile", group_keys=False)
     .apply(lambda g: g.sample(min(per_bin, len(g)), random_state=RANDOM_SEED))
-    .drop(columns="_decile")
+    .reset_index(drop=True)
 )
 print(f"  Stratified sample size    : {len(df_sample):,}")
 
