@@ -20,3 +20,6 @@ mean absolut error (MAE)
 MAE computes the average absolute difference between predicted and actual values.
 It measures the average magnitude of errors, with higher values indicating larger discrepancies between predicted and actual values.
 MAE is less sensitive to outliers than MSE but may not adequately penalize large errors.
+
+
+https://spotintelligence.com/2024/03/27/regression-metrics-for-machine-learning/#How_To_Implement_Regression_Metrics_in_Python_MSE_RMSE_MAE_R%C2%B2
