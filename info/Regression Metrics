@@ -1,3 +1,4 @@
+---BASICS---
 R-squared (R²)
 R² measures the proportion of variance in the dependent variable explained by the independent variables.
 R² ranges from 0 to 1, with higher values indicating a better fit of the model to the data. However, it does not provide information about the goodness of individual predictions.
@@ -20,6 +21,15 @@ mean absolut error (MAE)
 MAE computes the average absolute difference between predicted and actual values.
 It measures the average magnitude of errors, with higher values indicating larger discrepancies between predicted and actual values.
 MAE is less sensitive to outliers than MSE but may not adequately penalize large errors.
+
+
+---ADVANCED---
+Adjusted R-squared
+Adjusted R-squared adjusts the R-squared value for the number of predictors in the model, penalizing excessive model complexity.
+Adjusted R-squared provides a more accurate measure of model fit by accounting for the trade-off between explanatory power and model complexity, making it useful for model selection and comparison.
+
+
+
 
 
 https://spotintelligence.com/2024/03/27/regression-metrics-for-machine-learning/#How_To_Implement_Regression_Metrics_in_Python_MSE_RMSE_MAE_R%C2%B2
