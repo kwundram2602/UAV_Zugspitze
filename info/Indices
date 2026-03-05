@@ -1,0 +1,34 @@
+slope
+terrain slope refers to the measurement of steepness or incline at any given point on the land surface.
+It is an essential part of terrain analysis. A slope is represented as an angle in degrees or as a percentage.
+Slope Calculation in Degrees (0-90): Slope is expressed as the angle between a horizontal plane and a terrain surface. A 0° slope denotes a flat terrain whereas, a 90° slope represents a vertical incline.
+https://gisnavigator.co.uk/slope-and-aspect-terrain-analysis/
+
+
+aspect
+Aspect, in the context of geographical and environmental concepts, refers to the direction that a slope faces in relation to the cardinal points (north, south, east, west).
+Aspect helps in determining the microclimate of an area as it influences the amount of sunlight that particular area happens to receive throughout the day.
+South-facing slopes receive more sunlight as compared to the north-facing slopes.
+The method of calculating aspects involves the analysis of DEMs and other topographic data. The aspect is shown in the data as an angle ranging from 0 to 360 degrees.
+Allow us to share what the values correspond to:  0° corresponds to the north, 90° corresponds to the east, 180° corresponds to the south and 270° corresponds to the west. 
+https://gisnavigator.co.uk/slope-and-aspect-terrain-analysis/
+
+
+tpi
+TPI measures the difference between elevation at the central point (z0) and the average elevation (z) around it within a predetermined radius (R).
+Positive TPI values indicate that the central point is located higher than its average surroundings, while negative values indicate a position lower than the average.
+The range of TPI depends not only on elevation differences but also on R.
+Large R-values mainly reveal major landscape units, while smaller values highlight smaller features, such as minor valleys and ridges.
+http://dx.doi.org/10.1016/j.geomorph.2012.12.015
+
+
+windward index
+The objective of the maximum upwind slope (Sx) parameter was to quantify the extent of shelter or exposure provided by the terrain upwind of each pixel.
+To determine the value of the Sx parameter, we examined all cells along a vector emanating from the cell of interest, determined the cell that had the greatest upward
+slope relative to the cell of interest, and returned the slope between this shelter-defining cell and the cell of interest.
+The selection of a maximum shelter-producing pixel based on slope is analogous to the determination of solar shading within the horizon function used in radiation modeling.
+Negative Sx values indicated exposure relative to the shelter-defining pixel (i.e., the cell of interest was higher than the shelter-defining pixel). Theoretically,
+increasingly negative Sx values correspond to greater constrictions on the approaching wind flow, leading to increasing wind speeds, while increasingly positive Sx
+values correspond to larger and more proximal landscape obstacles, producing a greater degree of shelter and lower wind speeds.
+Winstral et al: Spatial Snow Modeling of Wind-Redistributed Snow Using Terrain-Based Parameters (2002)
+https://doi.org/10.1175/1525-7541(2002)003%3C0524:SSMOWR%3E2.0.CO;2

@@ -1,0 +1,22 @@
+R-squared (R²)
+R² measures the proportion of variance in the dependent variable explained by the independent variables.
+R² ranges from 0 to 1, with higher values indicating a better fit of the model to the data. However, it does not provide information about the goodness of individual predictions.
+R² may artificially increase with more independent variables, and a high R² does not necessarily imply a good model fit.
+
+
+mean squared error (MSE)
+MSE calculates the average squared difference between predicted and actual values.
+MSE measures the average squared error, with higher values indicating more significant discrepancies between predicted and actual values.
+MSE penalizes more significant errors due to squaring, making it sensitive to outliers. It is commonly used due to its mathematical properties but may be less interpretable than other metrics.
+
+
+root mean squared error (RSME)
+RMSE is the square root of the MSE and measures the average magnitude of errors.
+RMSE shares a similar interpretation to MSE but is in the same units as the dependent variable, making it more interpretable.
+RMSE is preferred when the distribution of errors is not normal or when outliers are present, as it mitigates the impact of large errors.
+
+
+mean absolut error (MAE)
+MAE computes the average absolute difference between predicted and actual values.
+It measures the average magnitude of errors, with higher values indicating larger discrepancies between predicted and actual values.
+MAE is less sensitive to outliers than MSE but may not adequately penalize large errors.
