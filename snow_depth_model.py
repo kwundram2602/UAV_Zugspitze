@@ -6,11 +6,13 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import rioxarray as riox
 
+#------------set whitebox working directory
 print(os.getcwd())
 wbe = WbEnvironment()
-wbe.working_directory = os.path.join(os.getcwd(), "uas_data")
+wbe.working_directory = os.path.join(os.getcwd(), "uas_data") #specify subfolder
 print(wbe.working_directory)
 
+#------------store all img paths in new variable
 dates = os.listdir("./uas_data/")
 print(dates)
 folders = [os.path.join(os.getcwd(), "uas_data", date) for date in dates]
@@ -19,8 +21,11 @@ print(folders)
 dsms = {}
 rgbs = {}
 snow_m = []
+
+#------------sort RGB and DSM files into the corresponding dictionaries
 for date, folder in zip(dates, folders):
     files = os.listdir(folder)
+    #list comprehension
     dsm_files = [f for f in files if "dsm" in f.lower() and f.lower().endswith(".tif")]
     dsms[date] = dsm_files
     rgb_files = [f for f in files if "rgb" in f.lower() and f.lower().endswith(".tif")]
@@ -32,9 +37,11 @@ print(rgbs)
 
 summer_date = "2025-08-20"
 winter_date = "2026-01-17"
+
+#------------select specific DSM and rasterize it
 wbe.working_directory = os.path.join(os.getcwd(), "uas_data", summer_date)
 print(wbe.working_directory)
-summer_lidar_dsm = dsms[summer_date][0]
+summer_lidar_dsm = dsms[summer_date][0] #choose dic entry equal to summer_date and choose the first entry of that list
 print(summer_lidar_dsm)
 wbe_summer_lidar_dsm = wbe.read_raster(summer_lidar_dsm)
 
@@ -44,6 +51,7 @@ winter_lidar_dsm = dsms[winter_date][0]
 print(winter_lidar_dsm)
 wbe_winter_lidar_dsm = wbe.read_raster(winter_lidar_dsm)
 
+#------------calculate snow depth model and store it
 snow_depth_model = wbe_winter_lidar_dsm - wbe_summer_lidar_dsm
 output_dir = os.path.join(os.getcwd(), "out")
 os.makedirs(output_dir, exist_ok=True)

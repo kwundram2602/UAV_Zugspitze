@@ -97,6 +97,7 @@ print(f"  Total pixels : {snow.size:,}")
 # ─── 2. Build sample DataFrame ────────────────────────────────────────────────
 print_section("Building sample")
 
+#use .ravel() to convert multidimensional arrays into one single dimension
 df_dict = {"snow_depth": snow.ravel(), "slope": slope.ravel()}
 for key, arr in tpi_arrays.items():
     df_dict[key] = arr.ravel()
@@ -105,6 +106,7 @@ for key, arr in wi_arrays.items():
 
 df = pd.DataFrame(df_dict)
 
+#filter df_valid with upper and lower limits
 df_valid = df.dropna()
 df_valid = df_valid[
     (df_valid["snow_depth"] >= SNOW_MIN_M) &
@@ -124,23 +126,28 @@ df_sample = (
 )
 print(f"  Stratified sample size    : {len(df_sample):,}")
 
+#create a list of all features
 FEATURES = (
     ["slope"]
     + list(tpi_arrays.keys())
     + list(wi_arrays.keys())
 )
 
+#create dictionary with key-value pairs for all feature labels
 FEATURE_LABELS = {"slope": "Slope (°)"}
 for r in TPI_RADII_PX:
     FEATURE_LABELS[f"tpi_{r}px"] = f"TPI {r}px ({r*0.10:.0f} m)"
 for label, deg in WIND_DIRECTIONS.items():
     FEATURE_LABELS[f"wi_{label}"] = f"WI {label} ({deg}°)"
 
+#list comprehension to create list to set order equal to feature labels dic
 feat_labels = [FEATURE_LABELS[f] for f in FEATURES]
 
+#convert and assign df_sample in to a NumpyArray via .values
 X = df_sample[FEATURES].values
 y = df_sample["snow_depth"].values
 
+#create test and train dataset
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=RANDOM_SEED
 )
@@ -148,6 +155,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 # ─── 3. Random Forest ─────────────────────────────────────────────────────────
 print_section("Random Forest")
 
+#configure RandomForest model
 rf = RandomForestRegressor(
     n_estimators=300,
     max_depth=12,
@@ -155,9 +163,13 @@ rf = RandomForestRegressor(
     n_jobs=-1,
     random_state=RANDOM_SEED,
 )
+#train model with both variables
 rf.fit(X_train, y_train)
+
+#create the predictions
 y_pred_rf = rf.predict(X_test)
 
+#calculate performance metrics
 r2_rf   = r2_score(y_test, y_pred_rf)
 mae_rf  = mean_absolute_error(y_test, y_pred_rf)
 rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred_rf))
@@ -166,6 +178,7 @@ print(f"  R²   = {r2_rf:.4f}")
 print(f"  MAE  = {mae_rf:.4f} m")
 print(f"  RMSE = {rmse_rf:.4f} m")
 print(f"  Feature importances:")
+
 for feat, imp in sorted(zip(FEATURES, rf.feature_importances_), key=lambda x: -x[1]):
     print(f"    {feat:20s}: {imp:.4f}")
 
