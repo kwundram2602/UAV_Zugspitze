@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV #import methods to improve performance
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.inspection import PartialDependenceDisplay
 from pathlib import Path
@@ -155,32 +156,56 @@ X_train, X_test, y_train, y_test = train_test_split(
 # ─── 3. Random Forest ─────────────────────────────────────────────────────────
 print_section("Random Forest")
 
-#configure RandomForest model
-rf = RandomForestRegressor(
-    n_estimators=300,
-    max_depth=12,
-    min_samples_leaf=20,
+# 1. Define the parameter grid for optimization
+# Note: Added your 'fixed' values into the grid to validate them
+param_grid = {
+    'n_estimators': [200, 300],
+    'max_depth': [10, 12, 15, None],
+    'min_samples_split': [2, 5],
+    'min_samples_leaf': [10, 20, 30],
+    'bootstrap': [True]
+}
+
+# 2. Initialize the base model with static parameters
+# n_jobs=-1 inside GridSearchCV allows parallel processing of different combinations
+base_rf = RandomForestRegressor(random_state=RANDOM_SEED, n_jobs=-1)
+
+# 3. Configure and run GridSearchCV
+# refit=True ensures the best model is retrained on the full training set
+grid_search = GridSearchCV(
+    estimator=base_rf, 
+    param_grid=param_grid, 
+    cv=5, 
+    scoring='neg_mean_squared_error',
     n_jobs=-1,
-    random_state=RANDOM_SEED,
+    verbose=1
 )
-#train model with both variables
-rf.fit(X_train, y_train)
 
-#create the predictions
-y_pred_rf = rf.predict(X_test)
+grid_search.fit(X_train, y_train)
 
-#calculate performance metrics
+# 4. Extract the best model and parameters
+best_rf_model = grid_search.best_estimator_
+print(f"Best Parameters found: {grid_search.best_params_}")
+
+# 5. Generate predictions using the optimized model
+y_pred_rf = best_rf_model.predict(X_test)
+
+# 6. Calculate and display performance metrics
 r2_rf   = r2_score(y_test, y_pred_rf)
 mae_rf  = mean_absolute_error(y_test, y_pred_rf)
 rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred_rf))
 
-print(f"  R²   = {r2_rf:.4f}")
-print(f"  MAE  = {mae_rf:.4f} m")
-print(f"  RMSE = {rmse_rf:.4f} m")
-print(f"  Feature importances:")
+print("-" * 30)
+print(f"R²   = {r2_rf:.4f}")
+print(f"MAE  = {mae_rf:.4f} m")
+print(f"RMSE = {rmse_rf:.4f} m")
+print("-" * 30)
 
-for feat, imp in sorted(zip(FEATURES, rf.feature_importances_), key=lambda x: -x[1]):
-    print(f"    {feat:20s}: {imp:.4f}")
+# 7. Analyze and display Feature Importances
+print("Feature Importances:")
+importances = zip(FEATURES, best_rf_model.feature_importances_)
+for feat, imp in sorted(importances, key=lambda x: x[1], reverse=True):
+    print(f"  {feat:20s}: {imp:.4f}")
 
 # ─── 4. Summary CSV ───────────────────────────────────────────────────────────
 summary = pd.DataFrame({
