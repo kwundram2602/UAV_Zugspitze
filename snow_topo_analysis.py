@@ -290,7 +290,7 @@ fig3.suptitle(f"Partial Dependence Plots – Random Forest  (R²={r2_rf:.3f})",
               fontsize=12)
 
 PartialDependenceDisplay.from_estimator(
-    rf, X_test,
+    best_rf_model, X_test,
     features=list(range(n_feat)),
     feature_names=feat_labels,
     ax=axes3_flat[:n_feat],
