@@ -32,6 +32,7 @@ import rioxarray as riox
 import matplotlib
 matplotlib.use("Agg")           # headless; change to "TkAgg" if you want a window
 import matplotlib.pyplot as plt
+import joblib
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
@@ -207,15 +208,28 @@ importances = zip(FEATURES, best_rf_model.feature_importances_)
 for feat, imp in sorted(importances, key=lambda x: x[1], reverse=True):
     print(f"  {feat:20s}: {imp:.4f}")
 
+# 8. Save model
+print(f"Best Model Configuration: {best_rf_model.get_params()}")
+
+# Save the model to the results directory
+joblib.dump(best_rf_model, Path(RESULTS_DIR) / "best_random_forest_model.pkl")
+
 # ─── 4. Summary CSV ───────────────────────────────────────────────────────────
 summary = pd.DataFrame({
     "feature"      : FEATURES,
     "feature_label": feat_labels,
     "rf_importance": best_rf_model.feature_importances_,
 })
+
+# Add the best hyperparameters as new columns
+# This maps each parameter key/value pair from best_params_ to the DataFrame
+for param, value in grid_search.best_params_.items():
+    summary[f"param_{param}"] = value
+
 summary_path = os.path.join(RESULTS_DIR, "snow_topo_summary.csv")
 summary.to_csv(summary_path, index=False)
-print(f"\nSummary table saved → {summary_path}")
+
+print(f"\nSummary table with best parameters saved → {summary_path}")
 
 # ─── 5. Plots ─────────────────────────────────────────────────────────────────
 print_section("Plotting")
