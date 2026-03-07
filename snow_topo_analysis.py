@@ -211,7 +211,7 @@ for feat, imp in sorted(importances, key=lambda x: x[1], reverse=True):
 summary = pd.DataFrame({
     "feature"      : FEATURES,
     "feature_label": feat_labels,
-    "rf_importance": rf.feature_importances_,
+    "rf_importance": best_rf_model.feature_importances_,
 })
 summary_path = os.path.join(RESULTS_DIR, "snow_topo_summary.csv")
 summary.to_csv(summary_path, index=False)
@@ -233,7 +233,7 @@ fig.suptitle(
 
 # RF feature importances
 ax = axes[0]
-feat_imp = pd.Series(rf.feature_importances_, index=feat_labels)
+feat_imp = pd.Series(best_rf_model.feature_importances_, index=feat_labels)
 feat_imp.sort_values().plot.barh(ax=ax, color="#2196F3")
 ax.set_title("RF Feature Importances\n(mean decrease in impurity)")
 ax.set_xlabel("Importance")
@@ -308,5 +308,5 @@ print(f"  Partial dependence plot saved → {pdp_path}")
 print_section("Results summary")
 print(f"  Random Forest R²  = {r2_rf:.4f}")
 print(f"  RMSE              = {rmse_rf:.4f} m")
-print(f"  Most important predictor: {FEATURE_LABELS[FEATURES[np.argmax(rf.feature_importances_)]]}")
+print(f"  Most important predictor: {FEATURE_LABELS[FEATURES[np.argmax(best_rf_model.feature_importances_)]]}")
 print(f"\nAll outputs in: {RESULTS_DIR}")
