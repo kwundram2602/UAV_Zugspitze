@@ -42,7 +42,7 @@ from pathlib import Path
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 HERE        = Path(__file__).resolve().parent
-OUT_DIR     = HERE / "out2"
+OUT_DIR     = HERE / "out_chunked"
 INDICES_DIR = os.path.join(OUT_DIR, "indices")    # rasters from topo_indices.py
 RESULTS_DIR = os.path.join(OUT_DIR, "analysis")   # plots + CSV from this script
 
@@ -53,8 +53,14 @@ TPI_RADII_PX = [50, 250, 500]   # → 5 m, 25 m, 50 m at 10 cm resolution
 WIND_DIRECTIONS = {"SW": 225, "W": 270, "E": 90, "SE": 135}
 
 # Sampling
-N_SAMPLE    = 15_000_000   # max pixels drawn for modelling
+N_SAMPLE    = 1_000_000   # max pixels drawn for modelling
 RANDOM_SEED = 42
+
+# Spatial chunk experiment
+RUN_CHUNK_EXPERIMENT = True
+CHUNK_ROWS = 4
+CHUNK_COLS = 4
+MIN_CHUNK_SAMPLES = 120_000
 
 # Snow depth filter (remove outliers / artefacts)
 SNOW_MIN_M = 0.04   # below this → likely measurement noise, excluded
@@ -70,6 +76,49 @@ def load_raster(path: str) -> np.ndarray:
 
 def print_section(title: str):
     print(f"\n{'─' * 60}\n  {title}\n{'─' * 60}")
+
+
+def chunkize(shape: tuple[int, int], n_rows: int, n_cols: int) -> np.ndarray:
+    """Return a 2-D integer chunk-id map for a raster shape."""
+    if n_rows < 1 or n_cols < 1:
+        raise ValueError("n_rows and n_cols must both be >= 1")
+
+    height, width = shape
+    row_edges = np.linspace(0, height, n_rows + 1, dtype=int)
+    col_edges = np.linspace(0, width, n_cols + 1, dtype=int)
+
+    chunk_map = np.empty((height, width), dtype=np.int32)
+    chunk_id = 0
+    for r in range(n_rows):
+        r0, r1 = row_edges[r], row_edges[r + 1]
+        for c in range(n_cols):
+            c0, c1 = col_edges[c], col_edges[c + 1]
+            chunk_map[r0:r1, c0:c1] = chunk_id
+            chunk_id += 1
+
+    return chunk_map
+
+
+def fit_and_score_rf(X_train: np.ndarray, X_test: np.ndarray,
+                     y_train: np.ndarray, y_test: np.ndarray,
+                     random_seed: int) -> tuple[RandomForestRegressor, np.ndarray, dict]:
+    """Train RF and return model, predictions, and score dictionary."""
+    rf = RandomForestRegressor(
+        n_estimators=300,
+        max_depth=12,
+        min_samples_leaf=20,
+        n_jobs=-1,
+        random_state=random_seed,
+    )
+    rf.fit(X_train, y_train)
+    y_pred = rf.predict(X_test)
+
+    scores = {
+        "r2": r2_score(y_test, y_pred),
+        "mae": mean_absolute_error(y_test, y_pred),
+        "rmse": np.sqrt(mean_squared_error(y_test, y_pred)),
+    }
+    return rf, y_pred, scores
 
 def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -98,7 +147,13 @@ def main():
     # ─── 2. Build sample DataFrame ────────────────────────────────────────────────
     print_section("Building sample")
 
-    df_dict = {"snow_depth": snow.ravel(), "slope": slope.ravel()}
+    chunk_map = chunkize(snow.shape, CHUNK_ROWS, CHUNK_COLS)
+
+    df_dict = {
+        "snow_depth": snow.ravel(),
+        "slope": slope.ravel(),
+        "chunk_id": chunk_map.ravel(),
+    }
     for key, arr in tpi_arrays.items():
         df_dict[key] = arr.ravel()
     for key, arr in wi_arrays.items():
@@ -149,19 +204,13 @@ def main():
     # ─── 3. Random Forest ─────────────────────────────────────────────────────────
     print_section("Random Forest")
 
-    rf = RandomForestRegressor(
-        n_estimators=300,
-        max_depth=12,
-        min_samples_leaf=20,
-        n_jobs=-1,
-        random_state=RANDOM_SEED,
+    rf, y_pred_rf, global_scores = fit_and_score_rf(
+        X_train, X_test, y_train, y_test, RANDOM_SEED
     )
-    rf.fit(X_train, y_train)
-    y_pred_rf = rf.predict(X_test)
 
-    r2_rf   = r2_score(y_test, y_pred_rf)
-    mae_rf  = mean_absolute_error(y_test, y_pred_rf)
-    rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred_rf))
+    r2_rf = global_scores["r2"]
+    mae_rf = global_scores["mae"]
+    rmse_rf = global_scores["rmse"]
 
     print(f"  R²   = {r2_rf:.4f}")
     print(f"  MAE  = {mae_rf:.4f} m")
@@ -169,6 +218,90 @@ def main():
     print(f"  Feature importances:")
     for feat, imp in sorted(zip(FEATURES, rf.feature_importances_), key=lambda x: -x[1]):
         print(f"    {feat:20s}: {imp:.4f}")
+
+    # ─── 3b. Chunk-wise Random Forest experiment ────────────────────────────────
+    chunk_summary = None
+    if RUN_CHUNK_EXPERIMENT:
+        print_section("Chunk-wise Random Forest")
+        print(f"  Chunk grid              : {CHUNK_ROWS} x {CHUNK_COLS}")
+        print(f"  Min samples per chunk   : {MIN_CHUNK_SAMPLES:,}")
+
+        y_true_all = []
+        y_pred_all = []
+        chunk_rows = []
+
+        for chunk_id, g in df_sample.groupby("chunk_id"):
+            n_chunk = len(g)
+            if n_chunk < MIN_CHUNK_SAMPLES:
+                chunk_rows.append({
+                    "chunk_id": int(chunk_id),
+                    "n_samples": int(n_chunk),
+                    "r2": np.nan,
+                    "mae": np.nan,
+                    "rmse": np.nan,
+                    "status": "skipped_too_small",
+                })
+                continue
+
+            Xc = g[FEATURES].values
+            yc = g["snow_depth"].values
+            Xc_train, Xc_test, yc_train, yc_test = train_test_split(
+                Xc, yc, test_size=0.2, random_state=RANDOM_SEED
+            )
+            _, y_chunk_pred, chunk_scores = fit_and_score_rf(
+                Xc_train, Xc_test, yc_train, yc_test, RANDOM_SEED
+            )
+
+            y_true_all.append(yc_test)
+            y_pred_all.append(y_chunk_pred)
+            chunk_rows.append({
+                "chunk_id": int(chunk_id),
+                "n_samples": int(n_chunk),
+                "r2": chunk_scores["r2"],
+                "mae": chunk_scores["mae"],
+                "rmse": chunk_scores["rmse"],
+                "status": "ok",
+            })
+
+            print(
+                f"  chunk={int(chunk_id):2d}  n={n_chunk:9,}  "
+                f"R²={chunk_scores['r2']:.4f}  RMSE={chunk_scores['rmse']:.4f} m"
+            )
+
+        chunk_summary = pd.DataFrame(chunk_rows).sort_values("chunk_id").reset_index(drop=True)
+        chunk_summary_path = os.path.join(RESULTS_DIR, "snow_topo_chunk_summary.csv")
+        chunk_summary.to_csv(chunk_summary_path, index=False)
+        print(f"\n  Chunk summary saved      → {chunk_summary_path}")
+
+        valid_eval = chunk_summary[chunk_summary["status"] == "ok"]
+        if len(valid_eval) > 0 and y_true_all:
+            y_true_concat = np.concatenate(y_true_all)
+            y_pred_concat = np.concatenate(y_pred_all)
+            chunk_global_r2 = r2_score(y_true_concat, y_pred_concat)
+            chunk_global_mae = mean_absolute_error(y_true_concat, y_pred_concat)
+            chunk_global_rmse = np.sqrt(mean_squared_error(y_true_concat, y_pred_concat))
+
+            print("\n  Global vs chunked comparison")
+            print(f"    Global RF     : R²={r2_rf:.4f}  MAE={mae_rf:.4f} m  RMSE={rmse_rf:.4f} m")
+            print(
+                f"    Chunked RF    : R²={chunk_global_r2:.4f}  "
+                f"MAE={chunk_global_mae:.4f} m  RMSE={chunk_global_rmse:.4f} m"
+            )
+
+            cmp_df = pd.DataFrame([
+                {"model": "global", "r2": r2_rf, "mae": mae_rf, "rmse": rmse_rf},
+                {
+                    "model": "chunked_aggregate",
+                    "r2": chunk_global_r2,
+                    "mae": chunk_global_mae,
+                    "rmse": chunk_global_rmse,
+                },
+            ])
+            cmp_path = os.path.join(RESULTS_DIR, "snow_topo_global_vs_chunked.csv")
+            cmp_df.to_csv(cmp_path, index=False)
+            print(f"  Comparison table saved   → {cmp_path}")
+        else:
+            print("  No chunk had enough data for evaluation.")
 
     # ─── 4. Summary CSV ───────────────────────────────────────────────────────────
     summary = pd.DataFrame({
