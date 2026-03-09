@@ -24,7 +24,7 @@ Analysis results are written to   out/analysis/
 
 Run topo_indices.py first if the index rasters are missing.
 """
-
+#%%BASICS
 import os
 import numpy as np
 import pandas as pd
@@ -34,11 +34,12 @@ matplotlib.use("Agg")           # headless; change to "TkAgg" if you want a wind
 import matplotlib.pyplot as plt
 import joblib
 
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
-from sklearn.model_selection import GridSearchCV #import methods to improve performance
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.inspection import PartialDependenceDisplay
+from sklearn.inspection import permutation_importance
 from pathlib import Path
 
 
@@ -49,13 +50,15 @@ INDICES_DIR = os.path.join(OUT_DIR, "indices")    # rasters from topo_indices.py
 RESULTS_DIR = os.path.join(OUT_DIR, "analysis")   # plots + CSV from this script
 
 # All TPI scales to include as separate features
-TPI_RADII_PX = [50, 250, 500]   # → 5 m, 25 m, 50 m at 10 cm resolution
+TPI_RADII_PX = [50, 250]   # → 5 m, 25 m, 50 m at 10 cm resolution
 
 # Wind directions to include (must match labels from topo_indices.py)
-WIND_DIRECTIONS = {"SW": 225, "W": 270, "E": 90, "SE": 135}
+WIND_DIRECTIONS = {"SW": 225, "W": 270}
+
+RELIEFS = ["E", "SE", "SW", "W"]
 
 # Sampling
-N_SAMPLE    = 50_000   # max pixels drawn for modelling
+N_SAMPLE    = 100_000   # max pixels drawn for modelling
 RANDOM_SEED = 42
 
 # Snow depth filter (remove outliers / artefacts)
@@ -75,11 +78,14 @@ def print_section(title: str):
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# ─── 1. Load rasters ──────────────────────────────────────────────────────────
+#%% ─── 1. Load rasters ──────────────────────────────────────────────────────────
 print_section("Loading rasters")
 
 snow  = load_raster(os.path.join(OUT_DIR,     "snow_depth_model.tif"))
 slope = load_raster(os.path.join(INDICES_DIR, "slope.tif"))
+curve = load_raster(os.path.join(INDICES_DIR, "curvature_output.tif"))
+tri = load_raster(os.path.join(INDICES_DIR, "ruggedness_tri.tif"))
+geomorph = load_raster(os.path.join(INDICES_DIR, "geomorphons.tif"))
 
 tpi_arrays = {}
 for r in TPI_RADII_PX:
@@ -93,20 +99,82 @@ for label in WIND_DIRECTIONS:
     wi_arrays[key] = load_raster(os.path.join(INDICES_DIR, f"windward_index_{label}.tif"))
     print(f"  Loaded indices/windward_index_{label}.tif")
 
+relief_arrays = {}
+for rel in RELIEFS:
+    key = f"dir_rel_{rel}"
+    relief_arrays[key] = load_raster(os.path.join(INDICES_DIR, f"dir_relief_{rel}.tif"))
+    print(f"  Loaded indices/dir_relief_{rel}.tif")
+
 print(f"  Array shape  : {snow.shape}")
 print(f"  Total pixels : {snow.size:,}")
 
-# ─── 2. Build sample DataFrame ────────────────────────────────────────────────
+#%% ─── 2. Build sample DataFrame ────────────────────────────────────────────────
 print_section("Building sample")
 
 #use .ravel() to convert multidimensional arrays into one single dimension
-df_dict = {"snow_depth": snow.ravel(), "slope": slope.ravel()}
+df_dict = {
+    "snow_depth": snow.ravel(),
+    "slope": slope.ravel(),
+    "curve": curve.ravel(),
+    "tri": tri.ravel(),
+    "geomorph": geomorph.ravel()
+}
+
 for key, arr in tpi_arrays.items():
     df_dict[key] = arr.ravel()
 for key, arr in wi_arrays.items():
     df_dict[key] = arr.ravel()
+for key, arr in relief_arrays.items():
+    df_dict[key] = arr.ravel()
+
 
 df = pd.DataFrame(df_dict)
+
+#feature engineering
+print("  Engineering interaction features...")
+for label in WIND_DIRECTIONS:
+    key = f"wi_{label}"
+    inter_key = f"slope_x_{key}"
+    # Calculate interaction: Slope * Windward Index
+    df[inter_key] = df["slope"] * df[key]
+    
+
+FEATURES = (
+    ["slope"]
+    + ["curve"]
+    + ["tri"]
+    + ["geomorph"]
+    + list(tpi_arrays.keys())
+    + list(wi_arrays.keys())
+    + list(relief_arrays.keys())
+    + [f"slope_x_wi_{l}" for l in WIND_DIRECTIONS]  # New interaction features
+)
+
+#create dictionary with key-value pairs for all feature labels
+FEATURE_LABELS = {
+    "slope": "Slope (°)",
+    "curve": "Curvature",
+    "tri": "Terrain Ruggedness Index",
+    "geomorph": "Geomorphons"
+}
+
+for r in TPI_RADII_PX:
+    FEATURE_LABELS[f"tpi_{r}px"] = f"TPI {r}px ({r*0.10:.0f} m)"
+
+for label, deg in WIND_DIRECTIONS.items():
+    # Das Basis-Feature (wi_SW, wi_W, etc.)
+    base_key = f"wi_{label}"
+    FEATURE_LABELS[base_key] = f"WI {label} ({deg}°)"
+    
+    # Das Interaktions-Feature (slope_x_wi_SW, etc.)
+    # WICHTIG: Prüfe hier genau, ob du oben "slope_x_wi_" oder "slope_x_" geschrieben hast!
+    inter_key = f"slope_x_wi_{label}" 
+    FEATURE_LABELS[inter_key] = f"Slope x WI {label}"
+
+for rel in RELIEFS:
+    FEATURE_LABELS[f"dir_rel_{rel}"] = f"Directional Relief from {rel}"
+
+feat_labels = [FEATURE_LABELS[f] for f in FEATURES]
 
 #filter df_valid with upper and lower limits
 df_valid = df.dropna()
@@ -128,22 +196,6 @@ df_sample = (
 )
 print(f"  Stratified sample size    : {len(df_sample):,}")
 
-#create a list of all features
-FEATURES = (
-    ["slope"]
-    + list(tpi_arrays.keys())
-    + list(wi_arrays.keys())
-)
-
-#create dictionary with key-value pairs for all feature labels
-FEATURE_LABELS = {"slope": "Slope (°)"}
-for r in TPI_RADII_PX:
-    FEATURE_LABELS[f"tpi_{r}px"] = f"TPI {r}px ({r*0.10:.0f} m)"
-for label, deg in WIND_DIRECTIONS.items():
-    FEATURE_LABELS[f"wi_{label}"] = f"WI {label} ({deg}°)"
-
-#list comprehension to create list to set order equal to feature labels dic
-feat_labels = [FEATURE_LABELS[f] for f in FEATURES]
 
 #convert and assign df_sample in to a NumpyArray via .values
 X = df_sample[FEATURES].values
@@ -154,84 +206,97 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=RANDOM_SEED
 )
 
-# ─── 3. Random Forest ─────────────────────────────────────────────────────────
-print_section("Random Forest")
+#%% ─── 3. Hist Gradient Boosting ──────────────────────────────────────────────
+print_section("Section: Hist Gradient Boosting")
 
-# 1. Define the parameter grid for optimization
-# Note: Added your 'fixed' values into the grid to validate them
+#initialize model
+hgbr = HistGradientBoostingRegressor(random_state=RANDOM_SEED)
+
 param_grid = {
-    'n_estimators': [200, 300],
-    'max_depth': [10, 12, 15, None],
-    'min_samples_split': [2, 5],
-    'min_samples_leaf': [10, 20, 30],
-    'bootstrap': [True]
+    'max_iter': [300, 500, 800, 1000],    # Anzahl der Bäume
+    'learning_rate': [0.01, 0.05, 0.1],   # Schrittweite (kleiner = stabiler, aber braucht mehr Bäume)
+    'max_depth': [5, 10, 20],             # Tiefe der Bäume (Komplexität der Interaktionen)
+    'l2_regularization': [0.0, 0.1, 1.0], # Verhindert Overfitting auf Rauschen im DSM
+    'min_samples_leaf': [20, 50, 100]     # Wichtig bei 10cm Auflösung wegen Messrauschen
 }
 
-# 2. Initialize the base model with static parameters
-# n_jobs=-1 inside GridSearchCV allows parallel processing of different combinations
-base_rf = RandomForestRegressor(random_state=RANDOM_SEED, n_jobs=-1)
+print("Hyperparameter Tuning")
 
-# 3. Configure and run GridSearchCV
-# refit=True ensures the best model is retrained on the full training set
 grid_search = GridSearchCV(
-    estimator=base_rf, 
-    param_grid=param_grid, 
+    estimator=hgbr,
+    param_grid=param_grid,
     cv=5, 
-    scoring='neg_mean_squared_error',
-    n_jobs=-1,
+    scoring='r2', # Wir optimieren auf das Bestimmtheitsmaß
+    n_jobs=-1,    # Nutze alle verfügbaren CPU-Kerne (wichtig auf dem Cluster!)
     verbose=1
 )
 
 grid_search.fit(X_train, y_train)
 
-# 4. Extract the best model and parameters
-best_rf_model = grid_search.best_estimator_
-print(f"Best Parameters found: {grid_search.best_params_}")
+# Bestes Modell extrahieren
+hgb_model = grid_search.best_estimator_
 
-# 5. Generate predictions using the optimized model
-y_pred_rf = best_rf_model.predict(X_test)
+print(f"  Best Parameters: {grid_search.best_params_}")
+print(f"  Best CV R² Score: {grid_search.best_score_:.4f}")
 
-# 6. Calculate and display performance metrics
-r2_rf   = r2_score(y_test, y_pred_rf)
-mae_rf  = mean_absolute_error(y_test, y_pred_rf)
-rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred_rf))
+
+# 3. Predict and evaluate
+y_pred_hgb = hgb_model.predict(X_test)
+
+# 4. Calculate performance metrics
+r2_hgb   = r2_score(y_test, y_pred_hgb)
+mae_hgb  = mean_absolute_error(y_test, y_pred_hgb)
+rmse_hgb = np.sqrt(mean_squared_error(y_test, y_pred_hgb))
 
 print("-" * 30)
-print(f"R²   = {r2_rf:.4f}")
-print(f"MAE  = {mae_rf:.4f} m")
-print(f"RMSE = {rmse_rf:.4f} m")
+print(f"R²   = {r2_hgb:.4f}")
+print(f"MAE  = {mae_hgb:.4f} m")
+print(f"RMSE = {rmse_hgb:.4f} m")
 print("-" * 30)
 
-# 7. Analyze and display Feature Importances
-print("Feature Importances:")
-importances = zip(FEATURES, best_rf_model.feature_importances_)
-for feat, imp in sorted(importances, key=lambda x: x[1], reverse=True):
-    print(f"  {feat:20s}: {imp:.4f}")
+# 5. Calculate Feature Importances (Permutation Importance)
+# Note: n_jobs=-1 parallelizes the importance calculation
+result = permutation_importance(
+    hgb_model, X_test, y_test, 
+    n_repeats=10, 
+    random_state=RANDOM_SEED, 
+    n_jobs=-1
+)
+hgb_importances = result.importances_mean
 
-# 8. Save model
-print(f"Best Model Configuration: {best_rf_model.get_params()}")
+print("Feature Importances (Permutation):")
+sorted_idx = np.argsort(hgb_importances)[::-1]
+for i in sorted_idx:
+    print(f"  {FEATURES[i]:20s}: {hgb_importances[i]:.4f}")
 
-# Save the model to the results directory
-joblib.dump(best_rf_model, Path(RESULTS_DIR) / "best_random_forest_model.pkl")
+# 6. Save the model
+model_path = Path(RESULTS_DIR) / "best_hgb_model.pkl"
+joblib.dump(hgb_model, model_path)
+print(f"Model saved to → {model_path}")
 
-# ─── 4. Summary CSV ───────────────────────────────────────────────────────────
+#%% ─── 4. Summary CSV ───────────────────────────────────────────────────────────
+# Create the summary DataFrame
 summary = pd.DataFrame({
     "feature"      : FEATURES,
     "feature_label": feat_labels,
-    "rf_importance": best_rf_model.feature_importances_,
+    "hgb_importance": hgb_importances,
 })
 
-# Add the best hyperparameters as new columns
-# This maps each parameter key/value pair from best_params_ to the DataFrame
-for param, value in grid_search.best_params_.items():
-    summary[f"param_{param}"] = value
+# Add the active hyperparameters to the CSV
+# We extract them directly from the model object
+model_params = hgb_model.get_params()
+params_to_save = ['max_iter', 'learning_rate', 'max_depth', 'max_leaf_nodes', 'l2_regularization']
 
-summary_path = os.path.join(RESULTS_DIR, "snow_topo_summary.csv")
+for p in params_to_save:
+    summary[f"param_{p}"] = model_params.get(p)
+
+# Save to CSV
+summary_path = os.path.join(RESULTS_DIR, "snow_topo_summary_hgb.csv")
 summary.to_csv(summary_path, index=False)
 
-print(f"\nSummary table with best parameters saved → {summary_path}")
+print(f"\nSummary table with HGB parameters saved → {summary_path}")
 
-# ─── 5. Plots ─────────────────────────────────────────────────────────────────
+#%% ─── 5. Plots ─────────────────────────────────────────────────────────────────
 print_section("Plotting")
 
 n_feat = len(FEATURES)
@@ -245,20 +310,20 @@ fig.suptitle(
     fontsize=12,
 )
 
-# RF feature importances
+# HGB feature importances
 ax = axes[0]
-feat_imp = pd.Series(best_rf_model.feature_importances_, index=feat_labels)
+feat_imp = pd.Series(hgb_importances, index=feat_labels)
 feat_imp.sort_values().plot.barh(ax=ax, color="#2196F3")
-ax.set_title("RF Feature Importances\n(mean decrease in impurity)")
+ax.set_title("hgb Feature Importances\n(mean decrease in impurity)")
 ax.set_xlabel("Importance")
 ax.axvline(0, color="k", lw=0.5)
 
 # Predicted vs observed
 ax = axes[1]
-ax.hexbin(y_test, y_pred_rf, gridsize=60, cmap="Blues", mincnt=1)
-lim = [0, max(y_test.max(), y_pred_rf.max())]
+ax.hexbin(y_test, y_pred_hgb, gridsize=60, cmap="Blues", mincnt=1)
+lim = [0, max(y_test.max(), y_pred_hgb.max())]
 ax.plot(lim, lim, "r--", lw=1.2, label="1:1 line")
-ax.set_title(f"RF: Predicted vs Observed\nR² = {r2_rf:.3f}  RMSE = {rmse_rf:.3f} m")
+ax.set_title(f"hgb: Predicted vs Observed\nR² = {r2_hgb:.3f}  RMSE = {rmse_hgb:.3f} m")
 ax.set_xlabel("Observed snow depth (m)")
 ax.set_ylabel("Predicted snow depth (m)")
 ax.legend(fontsize=8)
@@ -296,15 +361,15 @@ plt.savefig(scatter_path, dpi=150, bbox_inches="tight")
 plt.close()
 print(f"  Scatter grid saved → {scatter_path}")
 
-# ── 5c. Partial dependence plots (RF) ─────────────────────────────────────────
+# ── 5c. Partial dependence plots (hgb) ─────────────────────────────────────────
 fig3, axes3 = plt.subplots(n_rows, n_cols,
                             figsize=(n_cols * 4, n_rows * 3.5))
 axes3_flat = axes3.ravel() if n_feat > 1 else [axes3]
-fig3.suptitle(f"Partial Dependence Plots – Random Forest  (R²={r2_rf:.3f})",
+fig3.suptitle(f"Partial Dependence Plots – Random Forest  (R²={r2_hgb:.3f})",
               fontsize=12)
 
 PartialDependenceDisplay.from_estimator(
-    best_rf_model, X_test,
+    hgb_model, X_test,
     features=list(range(n_feat)),
     feature_names=feat_labels,
     ax=axes3_flat[:n_feat],
@@ -320,7 +385,7 @@ print(f"  Partial dependence plot saved → {pdp_path}")
 
 # ─── Done ─────────────────────────────────────────────────────────────────────
 print_section("Results summary")
-print(f"  Random Forest R²  = {r2_rf:.4f}")
-print(f"  RMSE              = {rmse_rf:.4f} m")
-print(f"  Most important predictor: {FEATURE_LABELS[FEATURES[np.argmax(best_rf_model.feature_importances_)]]}")
+print(f"  Random Forest R²  = {r2_hgb:.4f}")
+print(f"  RMSE              = {rmse_hgb:.4f} m")
+print(f"  Most important predictor: {FEATURE_LABELS[FEATURES[np.argmax(hgb_importances)]]}")
 print(f"\nAll outputs in: {RESULTS_DIR}")
