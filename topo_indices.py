@@ -12,15 +12,17 @@ snow distribution analysis:
                       computed for 4 wind directions: SW, W, E, SE
 
 """
-
+#%% IMPORTS
 import os
 from pathlib import Path                          
 import numpy as np
+import whitebox
 import whitebox_workflows as wbw
 from whitebox_workflows import WbEnvironment
 import rioxarray as riox
+import rasterio
 
-# ─── User configuration ───────────────────────────────────────────────────────
+#%% ─── User configuration ───────────────────────────────────────────────────────
 
 HERE        = Path(__file__).resolve().parent
 print(Path(__file__))
@@ -54,7 +56,7 @@ dsm_dir  = str(SUMMER_DSM.parent)                # ← FIX 3: use Path methods +
 dsm_name = SUMMER_DSM.name                        #    for whitebox compatibility
 
 
-# ── 1. Slope ──────────────────────────────────────────────────────────────────
+#%% ── 1. Slope ──────────────────────────────────────────────────────────────────
 print("Computing slope …")
 wbe.working_directory = dsm_dir
 dsm   = wbe.read_raster(dsm_name)
@@ -64,7 +66,7 @@ wbe.write_raster(slope, "slope.tif")
 print("  → out/indices/slope.tif")
 
 
-# ── 2. Aspect ─────────────────────────────────────────────────────────────────
+#%% ── 2. Aspect ─────────────────────────────────────────────────────────────────
 print("Computing aspect …")
 wbe.working_directory = dsm_dir
 dsm    = wbe.read_raster(dsm_name)
@@ -74,7 +76,7 @@ wbe.write_raster(aspect, "aspect.tif")
 print("  → out/indices/aspect.tif")
 
 
-# ── 3. TPI at multiple scales ─────────────────────────────────────────────────
+#%% ── 3. TPI at multiple scales ─────────────────────────────────────────────────
 for r in TPI_RADII_PX:
     label = f"tpi_{r}px"
     print(f"Computing TPI radius {r} px ({r * 0.10:.0f} m) …")
@@ -86,7 +88,7 @@ for r in TPI_RADII_PX:
     print(f"  → out/indices/{label}.tif")
 
 
-# ── 4. Windward Index for each wind direction ─────────────────────────────────
+#%% ── 4. Windward Index for each wind direction ─────────────────────────────────
 #   WI = cos(wind_from – aspect) × sin(slope)
 #   flat pixels → sin(0) = 0 → WI = 0 (neutral)
 
@@ -112,3 +114,41 @@ for label, deg in WIND_DIRECTIONS.items():
     print(f"  → out/indices/{out_name}")
 
 print("\nDone. All topographic indices written to:", INDICES_DIR)
+
+#%% ── 5. Plan Curvature ─────────────────────────────────
+wbt = whitebox.WhiteboxTools()
+
+input_dsm = SUMMER_DSM
+output_curvature = os.path.join(INDICES_DIR, 'curvature_output.tif')
+
+wbt.total_curvature(
+    dem=input_dsm,
+    output=output_curvature
+)
+
+#%% ── 6a. Vector Ruggedness Measure (VRM) / Terrain Ruggedness Index (TRI) ─────────────────────────────────
+wbt.ruggedness_index(
+    dem = str(SUMMER_DSM), 
+    output = str(os.path.join(INDICES_DIR, "ruggedness_tri.tif"))
+)
+
+#%% ── 6b. Geomorphons ─────────────────────────────────
+geomorph_path = os.path.join(INDICES_DIR, "geomorphons.tif")
+wbt.geomorphons(
+    dem = str(SUMMER_DSM), 
+    output = str(geomorph_path),
+    search = 50 # entspricht 5m bei 10cm Auflösung
+)
+
+#%% ── 7. Directional Relief ─────────────────────────────────
+for label, azimuth in WIND_DIRECTIONS.items():
+    output_path = os.path.join(INDICES_DIR, f"dir_relief_{label}.tif")
+    
+    # Whitebox Tool: Directional Relief
+    wbt.directional_relief(
+        dem = str(SUMMER_DSM),
+        output = str(output_path),
+        azimuth = azimuth,
+        max_dist = 100.0 # Suchradius in Metern (bei 10cm Auflösung sehr wichtig!)
+    )
+    print(f"  Directional Relief for {label} ({azimuth}°) calculated.")
