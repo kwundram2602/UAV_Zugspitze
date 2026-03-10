@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 16.0.3, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Ebene_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="1500px" height="820px" viewBox="0 0 1500 820" enable-background="new 0 0 1500 820" xml:space="preserve">
+<path fill="#F8F9FA" d="M16,0h1468c8.837,0,16,7.164,16,16v788c0,8.837-7.163,16-16,16H16c-8.836,0-16-7.163-16-16V16
+	C0,7.164,7.164,0,16,0z"/>
+<text transform="matrix(1 0 0 1 553.9873 44)" fill="#1A237E" font-family="'SegoeUI-Bold'" font-size="22">UAV Snow Depth Analysis – Workflow</text>
+<text transform="matrix(1 0 0 1 567.7017 66)" fill="#546E7A" font-family="'SegoeUI'" font-size="13">Zugspitze · Summer DSM 2025-08-20 · Winter DSM 2026-01-17</text>
+<path fill="#1565C0" d="M36,85h208c3.313,0,6,2.687,6,6v16c0,3.313-2.687,6-6,6H36c-3.313,0-6-2.687-6-6V91
+	C30,87.687,32.687,85,36,85z"/>
+<text transform="matrix(1 0 0 1 107.0176 104)" fill="#FFFFFF" font-family="'SegoeUI-Semibold'" font-size="12">1 Input Data</text>
+<path fill="#00695C" d="M271,85h208c3.313,0,6,2.687,6,6v16c0,3.313-2.687,6-6,6H271c-3.313,0-6-2.687-6-6V91
+	C265,87.687,267.687,85,271,85z"/>
+<text transform="matrix(1 0 0 1 333.583 104)" fill="#FFFFFF" font-family="'SegoeUI-Semibold'" font-size="12">2a Snow Depth</text>
+<path fill="#558B2F" d="M506,85h298c3.313,0,6,2.687,6,6v16c0,3.313-2.687,6-6,6H506c-3.313,0-6-2.687-6-6V91
+	C500,87.687,502.687,85,506,85z"/>
+<text transform="matrix(1 0 0 1 591.7539 104)" fill="#FFFFFF" font-family="'SegoeUI-Semibold'" font-size="12">2b Topographic Indices</text>
+<path fill="#6A1B9A" d="M831,85h208c3.313,0,6,2.687,6,6v16c0,3.313-2.687,6-6,6H831c-3.313,0-6-2.687-6-6V91
+	C825,87.687,827.687,85,831,85z"/>
+<text transform="matrix(1 0 0 1 875.4424 104)" fill="#FFFFFF" font-family="'SegoeUI-Semibold'" font-size="12">3 Feature Engineering</text>
+<path fill="#AD1457" d="M1066,85h178c3.313,0,6,2.687,6,6v16c0,3.313-2.687,6-6,6h-178c-3.313,0-6-2.687-6-6V91
+	C1060,87.687,1062.687,85,1066,85z"/>
+<text transform="matrix(1 0 0 1 1108.6553 104)" fill="#FFFFFF" font-family="'SegoeUI-Semibold'" font-size="12">4 Random Forest</text>
+<path fill="#E65100" d="M1271,85h193c3.313,0,6,2.687,6,6v16c0,3.313-2.687,6-6,6h-193c-3.313,0-6-2.687-6-6V91
+	C1265,87.687,1267.687,85,1271,85z"/>
+<text transform="matrix(1 0 0 1 1340.9443 104)" fill="#FFFFFF" font-family="'SegoeUI-Semibold'" font-size="12">5 Outputs</text>
+<path fill="#1565C0" d="M40,130h200c5.523,0,10,4.477,10,10v60c0,5.523-4.477,10-10,10H40c-5.523,0-10-4.477-10-10v-60
+	C30,134.477,34.477,130,40,130z"/>
+<text transform="matrix(1 0 0 1 97.9629 158)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="13">Summer DSM</text>
+<text transform="matrix(1 0 0 1 83.1416 175)" fill="#BBDEFB" font-family="'SegoeUI'" font-size="11">2025-08-20 · 10 cm res.</text>
+<text transform="matrix(1 0 0 1 98.5181 192)" fill="#90CAF9" font-family="'SegoeUI'" font-size="10">snow-free baseline</text>
+<path fill="#1565C0" d="M40,235h200c5.523,0,10,4.477,10,10v60c0,5.523-4.477,10-10,10H40c-5.523,0-10-4.477-10-10v-60
+	C30,239.477,34.477,235,40,235z"/>
+<text transform="matrix(1 0 0 1 102.6313 263)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="13">Winter DSM</text>
+<text transform="matrix(1 0 0 1 83.1416 280)" fill="#BBDEFB" font-family="'SegoeUI'" font-size="11">2026-01-17 · 10 cm res.</text>
+<text transform="matrix(1 0 0 1 106.9629 297)" fill="#90CAF9" font-family="'SegoeUI'" font-size="10">full snow cover</text>
+<path fill="none" d=""/>
+<path fill="#1565C0" d="M267.299,206.782l-11.494,3.448l10.345,13.601L267.299,206.782z"/>
+<path marker-end="url(#arr-blue)" fill="#1565C0" d="M265,220"/>
+<path fill="none" d=""/>
+<path fill="#1565C0" d="M255.168,244.129l11.236,4.213v-17.088L255.168,244.129z"/>
+<path marker-end="url(#arr-blue)" fill="#1565C0" d="M265,235"/>
+<path fill="#00796B" d="M275,185h200c5.522,0,10,4.477,10,10v55c0,5.523-4.478,10-10,10H275c-5.523,0-10-4.477-10-10v-55
+	C265,189.477,269.477,185,275,185z"/>
+<text transform="matrix(1 0 0 1 324.6709 210)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="12">DSM Differencing</text>
+<text transform="matrix(1 0 0 1 305.2456 227)" fill="#B2DFDB" font-family="'SegoeUI'" font-size="11">Winter DSM − Summer DSM</text>
+<path fill="none" d=""/>
+<path fill="#00796B" d="M381,278h-12l6,16L381,278z"/>
+<path marker-end="url(#arr-teal)" fill="#00796B" d="M375,290"/>
+<path fill="#004D40" d="M275,290h200c5.522,0,10,4.477,10,10v45c0,5.523-4.478,10-10,10H275c-5.523,0-10-4.477-10-10v-45
+	C265,294.477,269.477,290,275,290z"/>
+<text transform="matrix(1 0 0 1 320.8301 316)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="12">Snow Depth Model</text>
+<text transform="matrix(1 0 0 1 321.9497 333)" fill="#80CBC4" font-family="'SegoeUI'" font-size="11">snow_depth_model.tif</text>
+<text transform="matrix(1 0 0 1 330.6201 348)" fill="#4DB6AC" font-family="'SegoeUI'" font-size="10">range: 0.05 – 6.00 m</text>
+<path fill="none" d=""/>
+<path fill="#558B2F" d="M661,118h-12l6,16L661,118z"/>
+<path marker-end="url(#arr-green)" fill="#558B2F" d="M655,130"/>
+<path fill="#689F38" d="M508,130h294c4.418,0,8,3.582,8,8v22c0,4.418-3.582,8-8,8H508c-4.418,0-8-3.582-8-8v-22
+	C500,133.582,503.582,130,508,130z"/>
+<text transform="matrix(1 0 0 1 611.0459 147)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="12">topo_indices.py</text>
+<text transform="matrix(1 0 0 1 585.2734 161)" fill="#DCEDC8" font-family="'SegoeUI'" font-size="10">whitebox_workflows + rioxarray</text>
+<path fill="none" d=""/>
+<path fill="#558B2F" d="M558.9,193.2l-5.4-7.2l-6.9,10.8L558.9,193.2z"/>
+<path marker-end="url(#arr-green)" fill="#558B2F" d="M549,195"/>
+<path fill="none" d=""/>
+<path fill="#558B2F" d="M629.5,186h-9l4.5,12L629.5,186z"/>
+<path marker-end="url(#arr-green)" fill="#558B2F" d="M625,195"/>
+<path fill="none" d=""/>
+<path fill="#558B2F" d="M722.188,185.339l-6.604,6.115l11.455,5.748L722.188,185.339z"/>
+<path marker-end="url(#arr-green)" fill="#558B2F" d="M725,195"/>
+<path fill="#33691E" d="M508,195h84c4.418,0,8,3.582,8,8v39c0,4.418-3.582,8-8,8h-84c-4.418,0-8-3.582-8-8v-39
+	C500,198.582,503.582,195,508,195z"/>
+<text transform="matrix(1 0 0 1 535.6055 218)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="11">Slope</text>
+<text transform="matrix(1 0 0 1 532.4072 233)" fill="#DCEDC8" font-family="'SegoeUI'" font-size="10">degrees</text>
+<text transform="matrix(1 0 0 1 534.3662 244)" fill="#AED581" font-family="'SegoeUI'" font-size="9">slope.tif</text>
+<path fill="#33691E" d="M618,195h129c4.418,0,8,3.582,8,8v39c0,4.418-3.582,8-8,8H618c-4.418,0-8-3.582-8-8v-39
+	C610,198.582,613.582,195,618,195z"/>
+<text transform="matrix(1 0 0 1 648.4199 218)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="11">TPI (3 scales)</text>
+<text transform="matrix(1 0 0 1 643.8481 233)" fill="#DCEDC8" font-family="'SegoeUI'" font-size="10">5 m · 25 m · 50 m</text>
+<text transform="matrix(1 0 0 1 642.249 244)" fill="#AED581" font-family="'SegoeUI'" font-size="9">tpi_50/250/500px.tif</text>
+<path fill="#33691E" d="M508,265h239c4.418,0,8,3.582,8,8v39c0,4.418-3.582,8-8,8H508c-4.418,0-8-3.582-8-8v-39
+	C500,268.582,503.582,265,508,265z"/>
+<text transform="matrix(1 0 0 1 564.3867 288)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="11">Windward Index (4 dirs)</text>
+<text transform="matrix(1 0 0 1 541.082 303)" fill="#DCEDC8" font-family="'SegoeUI'" font-size="10">SW (225°) · W (270°) · E (90°) · SE (135°)</text>
+<text transform="matrix(1 0 0 1 586.3901 316)" fill="#AED581" font-family="'SegoeUI'" font-size="9">windward_index_*.tif</text>
+<path opacity="0.7" fill="#558B2F" enable-background="new    " d="M773,195h29c4.418,0,8,3.582,8,8v39c0,4.418-3.582,8-8,8h-29
+	c-4.418,0-8-3.582-8-8v-39C765,198.582,768.582,195,773,195z"/>
+<text transform="matrix(1 0 0 1 773.1943 223)" fill="#FFFFFF" font-family="'SegoeUI-Semibold'" font-size="9">Aspect</text>
+<text transform="matrix(1 0 0 1 777.3301 237)" fill="#DCEDC8" font-family="'SegoeUI'" font-size="8">inter-</text>
+<text transform="matrix(1 0 0 1 772.6563 248)" fill="#DCEDC8" font-family="'SegoeUI'" font-size="8">mediate</text>
+<path fill="none" d=""/>
+<path fill="#6A1B9A" d="M809.649,391.464l-2.688,11.695l16.938-2.263L809.649,391.464z"/>
+<path marker-end="url(#arr-purple)" fill="#6A1B9A" d="M820,400"/>
+<path fill="none" d=""/>
+<path fill="#6A1B9A" d="M817.09,366.903l-9.313,7.567l14.746,8.634L817.09,366.903z"/>
+<path marker-end="url(#arr-purple)" fill="#6A1B9A" d="M820,380"/>
+<path fill="#6A1B9A" d="M835,355h200c5.522,0,10,4.477,10,10v60c0,5.522-4.478,10-10,10H835c-5.522,0-10-4.478-10-10v-60
+	C825,359.477,829.478,355,835,355z"/>
+<text transform="matrix(1 0 0 1 893.2285 381)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="12">Pixel Sampling</text>
+<text transform="matrix(1 0 0 1 876.3447 397)" fill="#E1BEE7" font-family="'SegoeUI'" font-size="11">stratified by snow depth</text>
+<text transform="matrix(1 0 0 1 879.2363 412)" fill="#CE93D8" font-family="'SegoeUI'" font-size="10">n = 50,000 px · 10 deciles</text>
+<path fill="none" d=""/>
+<path fill="#6A1B9A" d="M941,448h-12l6,16L941,448z"/>
+<path marker-end="url(#arr-purple)" fill="#6A1B9A" d="M935,460"/>
+<path fill="#4A148C" d="M835,460h200c5.522,0,10,4.478,10,10v70c0,5.522-4.478,10-10,10H835c-5.522,0-10-4.478-10-10v-70
+	C825,464.478,829.478,460,835,460z"/>
+<text transform="matrix(1 0 0 1 883.4229 482)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="12">Feature Matrix (X)</text>
+<text transform="matrix(1 0 0 1 920.1953 498)" fill="#CE93D8" font-family="'SegoeUI'" font-size="10">· Slope</text>
+<text transform="matrix(1 0 0 1 884.5459 512)" fill="#CE93D8" font-family="'SegoeUI'" font-size="10">· TPI 5 m / 25 m / 50 m</text>
+<text transform="matrix(1 0 0 1 891.4014 526)" fill="#CE93D8" font-family="'SegoeUI'" font-size="10">· WI SW / W / E / SE</text>
+<text transform="matrix(1 0 0 1 881.7031 540)" fill="#9C27B0" font-family="'SegoeUI'" font-size="9">Target y = Snow Depth (m)</text>
+<path fill="none" d=""/>
+<path fill="#6A1B9A" d="M941,558h-12l6,16L941,558z"/>
+<path marker-end="url(#arr-purple)" fill="#6A1B9A" d="M935,570"/>
+<path fill="#7B1FA2" d="M873,570h124c4.418,0,8,3.582,8,8v22c0,4.418-3.582,8-8,8H873c-4.418,0-8-3.582-8-8v-22
+	C865,573.582,868.582,570,873,570z"/>
+<text transform="matrix(1 0 0 1 895.1006 588)" fill="#FFFFFF" font-family="'SegoeUI-Semibold'" font-size="11">Train / Test Split</text>
+<text transform="matrix(1 0 0 1 888.5918 602)" fill="#E1BEE7" font-family="'SegoeUI'" font-size="10">80 % train · 20 % test</text>
+<path fill="none" d=""/>
+<path fill="#AD1457" d="M1048,583v12l16-6L1048,583z"/>
+<path marker-end="url(#arr-pink)" fill="#AD1457" d="M1060,589"/>
+<path fill="#880E4F" d="M1070,555h170c5.522,0,10,4.478,10,10v95c0,5.522-4.478,10-10,10h-170c-5.522,0-10-4.478-10-10v-95
+	C1060,559.478,1064.478,555,1070,555z"/>
+<text transform="matrix(1 0 0 1 1108.7607 582)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="13">Random Forest</text>
+<text transform="matrix(1 0 0 1 1101.248 598)" fill="#F48FB1" font-family="'SegoeUI'" font-size="10">RandomForestRegressor</text>
+<path opacity="0.6" fill="#C2185B" enable-background="new    " d="M1081,607h148c3.313,0,6,2.687,6,6v40c0,3.313-2.687,6-6,6h-148
+	c-3.313,0-6-2.687-6-6v-40C1075,609.687,1077.687,607,1081,607z"/>
+<text transform="matrix(1 0 0 1 1112.873 623)" fill="#FFFFFF" font-family="'SegoeUI'" font-size="10">n_estimators = 300</text>
+<text transform="matrix(1 0 0 1 1119.207 637)" fill="#FFFFFF" font-family="'SegoeUI'" font-size="10">max_depth = 12</text>
+<text transform="matrix(1 0 0 1 1105.1582 651)" fill="#FFFFFF" font-family="'SegoeUI'" font-size="10">min_samples_leaf = 20</text>
+<path fill="none" d=""/>
+<path fill="#E65100" d="M1253,606v12l16-6L1253,606z"/>
+<path marker-end="url(#arr-orange)" fill="#E65100" d="M1265,612"/>
+<path fill="#BF360C" d="M1275,490h185c5.522,0,10,4.478,10,10v45c0,5.522-4.478,10-10,10h-185c-5.522,0-10-4.478-10-10v-45
+	C1265,494.478,1269.478,490,1275,490z"/>
+<text transform="matrix(1 0 0 1 1327.3096 513)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="12">Model Metrics</text>
+<text transform="matrix(1 0 0 1 1329.084 530)" fill="#FFCCBC" font-family="'SegoeUI'" font-size="11">R² · MAE · RMSE</text>
+<text transform="matrix(1 0 0 1 1322.1846 546)" fill="#FF8A65" font-family="'SegoeUI'" font-size="10">evaluated on test set</text>
+<path fill="#E64A19" d="M1275,565h185c5.522,0,10,4.478,10,10v35c0,5.522-4.478,10-10,10h-185c-5.522,0-10-4.478-10-10v-35
+	C1265,569.478,1269.478,565,1275,565z"/>
+<text transform="matrix(1 0 0 1 1312.5088 588)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="12">Feature Importance</text>
+<text transform="matrix(1 0 0 1 1309.7041 604)" fill="#FFCCBC" font-family="'SegoeUI'" font-size="10">mean decrease in impurity</text>
+<path fill="#E64A19" d="M1275,630h185c5.522,0,10,4.478,10,10v35c0,5.522-4.478,10-10,10h-185c-5.522,0-10-4.478-10-10v-35
+	C1265,634.478,1269.478,630,1275,630z"/>
+<text transform="matrix(1 0 0 1 1313.0625 653)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="12">Partial Dependence</text>
+<text transform="matrix(1 0 0 1 1325.7246 669)" fill="#FFCCBC" font-family="'SegoeUI'" font-size="10">per predictor (PDP)</text>
+<path fill="#BF360C" d="M1275,695h185c5.522,0,10,4.478,10,10v35c0,5.522-4.478,10-10,10h-185c-5.522,0-10-4.478-10-10v-35
+	C1265,699.478,1269.478,695,1275,695z"/>
+<text transform="matrix(1 0 0 1 1334.4961 718)" fill="#FFFFFF" font-family="'SegoeUI-Bold'" font-size="12">Scatter Grid</text>
+<text transform="matrix(1 0 0 1 1301.9863 734)" fill="#FFCCBC" font-family="'SegoeUI'" font-size="10">snow depth vs. each predictor</text>
+<line fill="none" stroke="#E65100" stroke-width="1.5" x1="1368" y1="555" x2="1368" y2="565"/>
+<line fill="none" stroke="#E65100" stroke-width="1.5" x1="1368" y1="620" x2="1368" y2="630"/>
+<line fill="none" stroke="#E65100" stroke-width="1.5" x1="1368" y1="685" x2="1368" y2="695"/>
+<path fill="none" d=""/>
+<path fill="#E65100" d="M1362,567h12l-6-16L1362,567z"/>
+<path marker-end="url(#arr-orange)" fill="#E65100" d="M1368,555"/>
+<path fill="#FFFFFF" stroke="#CFD8DC" d="M40,690h730c5.522,0,10,4.478,10,10v90c0,5.522-4.478,10-10,10H40c-5.523,0-10-4.478-10-10
+	v-90C30,694.478,34.477,690,40,690z"/>
+<text transform="matrix(1 0 0 1 50 712)" fill="#37474F" font-family="'SegoeUI-Bold'" font-size="12">Legend</text>
+<path fill="#1565C0" d="M54,722h10c2.209,0,4,1.791,4,4v10c0,2.209-1.791,4-4,4H54c-2.209,0-4-1.791-4-4v-10
+	C50,723.791,51.791,722,54,722z"/>
+<text transform="matrix(1 0 0 1 76 735)" fill="#37474F" font-family="'SegoeUI'" font-size="11">Input raster data (UAV DSM, 10 cm)</text>
+<path fill="#00796B" d="M54,748h10c2.209,0,4,1.791,4,4v10c0,2.209-1.791,4-4,4H54c-2.209,0-4-1.791-4-4v-10
+	C50,749.791,51.791,748,54,748z"/>
+<text transform="matrix(1 0 0 1 76 761)" fill="#37474F" font-family="'SegoeUI'" font-size="11">Raster processing (snow depth)</text>
+<path fill="#33691E" d="M279,722h10c2.209,0,4,1.791,4,4v10c0,2.209-1.791,4-4,4h-10c-2.209,0-4-1.791-4-4v-10
+	C275,723.791,276.791,722,279,722z"/>
+<text transform="matrix(1 0 0 1 301 735)" fill="#37474F" font-family="'SegoeUI'" font-size="11">Topographic index computation (whitebox)</text>
+<path fill="#6A1B9A" d="M279,748h10c2.209,0,4,1.791,4,4v10c0,2.209-1.791,4-4,4h-10c-2.209,0-4-1.791-4-4v-10
+	C275,749.791,276.791,748,279,748z"/>
+<text transform="matrix(1 0 0 1 301 761)" fill="#37474F" font-family="'SegoeUI'" font-size="11">Feature engineering &amp; sampling</text>
+<path fill="#880E4F" d="M514,722h10c2.209,0,4,1.791,4,4v10c0,2.209-1.791,4-4,4h-10c-2.209,0-4-1.791-4-4v-10
+	C510,723.791,511.791,722,514,722z"/>
+<text transform="matrix(1 0 0 1 536 735)" fill="#37474F" font-family="'SegoeUI'" font-size="11">Machine learning (sklearn RF)</text>
+<path fill="#E64A19" d="M514,748h10c2.209,0,4,1.791,4,4v10c0,2.209-1.791,4-4,4h-10c-2.209,0-4-1.791-4-4v-10
+	C510,749.791,511.791,748,514,748z"/>
+<text transform="matrix(1 0 0 1 536 761)" fill="#37474F" font-family="'SegoeUI'" font-size="11">Evaluation &amp; visualization outputs</text>
+<path fill="none" d=""/>
+<path fill="#546E7A" d="M78,779v12l16-6L78,779z"/>
+<path marker-end="url(#arr-grey)" fill="#546E7A" d="M90,785"/>
+<text transform="matrix(1 0 0 1 100 789)" fill="#37474F" font-family="'SegoeUI'" font-size="11">data flow </text>
+</svg>

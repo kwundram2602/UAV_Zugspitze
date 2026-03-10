@@ -5,3 +5,5 @@ out
 .ruff_cache
 uv.lock
 Poster_UAV/build
+downscale.py
+downscale
