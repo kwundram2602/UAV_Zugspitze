@@ -55,7 +55,7 @@ RESULTS_DIR = os.path.join(OUT_DIR, "analysis")   # plots + CSV from this script
 TPI_RADII_PX = [50, 250, 500]   # → 5 m, 25 m, 50 m at 10 cm resolution
 
 # Wind directions to include (must match labels from topo_indices.py)
-WIND_DIRECTIONS = {"SW": 225, "E": 90, "SE": 135}
+WIND_DIRECTIONS = {"E": 90, "SE": 135}
 
 # Directional relief directions (must match dir_relief_*.tif filenames)
 DIR_RELIEF_DIRECTIONS = ["E", "SE", "SW", "W"]
@@ -63,15 +63,19 @@ DIR_RELIEF_DIRECTIONS = ["E", "SE", "SW", "W"]
 # Model to use: "rf" (RandomForestRegressor) or "hgbr" (HistGradientBoostingRegressor)
 MODEL_TYPE = "hgbr"
 
+# Colormap for the predicted-vs-observed hexbin in analysis.png
+# Any matplotlib colormap name works, e.g. "Blues", "YlOrRd", "plasma", "viridis"
+SCATTER_CMAP = "Blues"
+
 # Sampling
-N_SAMPLE    = 1_000_000   # max pixels drawn for modelling
+N_SAMPLE    = 6_000_000   # max pixels drawn for modelling
 RANDOM_SEED = 42
 
 # Spatial chunk experiment
 RUN_CHUNK_EXPERIMENT = True
 CHUNK_ROWS = 4
 CHUNK_COLS = 4
-MIN_CHUNK_SAMPLES = 50_000
+MIN_CHUNK_SAMPLES = 300_000
 
 # Snow depth filter (remove outliers / artefacts)
 SNOW_MIN_M = 0.04   # below this → likely measurement noise, excluded
@@ -269,6 +273,7 @@ def make_model_plots(
     df_slice: pd.DataFrame,
     n_sample_total: int,
     model_type: str = "rf",
+    scatter_cmap: str = "Blues",
 ):
     """
     Generate and save the three standard diagnostic plots for one model.
@@ -331,7 +336,9 @@ def make_model_plots(
     ax.axvline(0, color="k", lw=0.5)
 
     ax = axes[1]
-    ax.hexbin(y_test, y_pred, gridsize=60, cmap="Blues", mincnt=1)
+    hb = ax.hexbin(y_test, y_pred, gridsize=60, cmap=scatter_cmap, mincnt=1)
+    cb = fig.colorbar(hb, ax=ax)
+    cb.set_label("n pixels", fontsize=9)
     lim = [0, max(y_test.max(), y_pred.max())]
     ax.plot(lim, lim, "r--", lw=1.2, label="1:1 line")
     ax.set_title(f"{model_name}: Predicted vs Observed\nR² = {r2:.3f}  RMSE = {rmse:.3f} m")
@@ -556,6 +563,7 @@ def main():
         df_slice=df_sample,
         n_sample_total=len(df_sample),
         model_type=MODEL_TYPE,
+        scatter_cmap=SCATTER_CMAP,
     )
 
     # Global summary CSV — importance column computed inside make_model_plots already;
@@ -635,6 +643,7 @@ def main():
                 df_slice=g,
                 n_sample_total=n_chunk,
                 model_type=MODEL_TYPE,
+                scatter_cmap=SCATTER_CMAP,
             )
 
             # Per-chunk feature importance CSV
