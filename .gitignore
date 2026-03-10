@@ -10,3 +10,4 @@ Poster_UAV/build
 dist
 __pycache__
 hpc/user/*
+out_chunked
