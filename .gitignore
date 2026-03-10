@@ -1,5 +1,6 @@
 uas_data
 out
+out2
 .vscode
 .venv
 .ruff_cache
@@ -7,3 +8,8 @@ uv.lock
 Poster_UAV/build
 downscale.py
 downscale
+*.egg-info
+dist
+__pycache__
+hpc/user/*
+out_chunked
