@@ -29,10 +29,12 @@ import os
 import numpy as np
 import pandas as pd
 import rioxarray as riox
+import geopandas as gpd
 import matplotlib
 matplotlib.use("Agg")           # headless; change to "TkAgg" if you want a window
 import matplotlib.pyplot as plt
 
+from shapely.geometry import box
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
@@ -53,7 +55,7 @@ TPI_RADII_PX = [50, 250, 500]   # → 5 m, 25 m, 50 m at 10 cm resolution
 WIND_DIRECTIONS = {"SW": 225, "W": 270, "E": 90, "SE": 135}
 
 # Sampling
-N_SAMPLE    = 1_000_000   # max pixels drawn for modelling
+N_SAMPLE    = 5_000_000   # max pixels drawn for modelling
 RANDOM_SEED = 42
 
 # Spatial chunk experiment
@@ -74,20 +76,82 @@ def load_raster(path: str) -> np.ndarray:
     return da.values
 
 
+def load_raster_with_meta(path: str) -> tuple[np.ndarray, object, object]:
+    """Load a single-band raster, return (2-D array, CRS, affine transform)."""
+    da = riox.open_rasterio(path, masked=True).squeeze()
+    return da.values, da.rio.crs, da.rio.transform()
+
+
 def print_section(title: str):
     print(f"\n{'─' * 60}\n  {title}\n{'─' * 60}")
 
 
-def chunkize(shape: tuple[int, int], n_rows: int, n_cols: int) -> np.ndarray:
-    """Return a 2-D integer chunk-id map for a raster shape."""
+def valid_data_bbox(arr: np.ndarray) -> tuple[int, int, int, int]:
+    """
+    Return the bounding box of non-NaN pixels as pixel indices.
+
+    Returns
+    -------
+    (row_min, row_max, col_min, col_max)
+        row_max and col_max are exclusive (i.e. suitable for slicing).
+    """
+    mask = ~np.isnan(arr)
+    valid_rows = np.where(np.any(mask, axis=1))[0]
+    valid_cols = np.where(np.any(mask, axis=0))[0]
+    if valid_rows.size == 0 or valid_cols.size == 0:
+        raise ValueError("Array contains no valid (non-NaN) pixels.")
+    return (
+        int(valid_rows[0]),
+        int(valid_rows[-1]) + 1,
+        int(valid_cols[0]),
+        int(valid_cols[-1]) + 1,
+    )
+
+
+def chunkize(
+    shape: tuple[int, int],
+    n_rows: int,
+    n_cols: int,
+    row_start: int = 0,
+    row_end:   int | None = None,
+    col_start: int = 0,
+    col_end:   int | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Divide a raster region into a regular grid of chunks.
+
+    The chunk grid covers only [row_start:row_end, col_start:col_end].
+    Pixels outside that region receive chunk_id = -1.
+
+    Parameters
+    ----------
+    shape                : full raster (height, width)
+    n_rows, n_cols       : grid dimensions
+    row_start / row_end  : pixel row bounds of the region to divide
+                           (row_end exclusive; defaults to full height)
+    col_start / col_end  : pixel col bounds of the region to divide
+                           (col_end exclusive; defaults to full width)
+
+    Returns
+    -------
+    chunk_map : ndarray of shape *shape*, dtype int32
+        Chunk id per pixel; -1 outside the chunked region.
+    row_edges : 1-D int array, length n_rows + 1
+        Row-pixel boundaries within [row_start, row_end].
+    col_edges : 1-D int array, length n_cols + 1
+        Col-pixel boundaries within [col_start, col_end].
+    """
     if n_rows < 1 or n_cols < 1:
         raise ValueError("n_rows and n_cols must both be >= 1")
 
     height, width = shape
-    row_edges = np.linspace(0, height, n_rows + 1, dtype=int)
-    col_edges = np.linspace(0, width, n_cols + 1, dtype=int)
+    row_end = row_end if row_end is not None else height
+    col_end = col_end if col_end is not None else width
 
-    chunk_map = np.empty((height, width), dtype=np.int32)
+    row_edges = np.round(np.linspace(row_start, row_end, n_rows + 1)).astype(int)
+    col_edges = np.round(np.linspace(col_start, col_end, n_cols + 1)).astype(int)
+
+    chunk_map = np.full((height, width), -1, dtype=np.int32)
     chunk_id = 0
     for r in range(n_rows):
         r0, r1 = row_edges[r], row_edges[r + 1]
@@ -96,12 +160,57 @@ def chunkize(shape: tuple[int, int], n_rows: int, n_cols: int) -> np.ndarray:
             chunk_map[r0:r1, c0:c1] = chunk_id
             chunk_id += 1
 
-    return chunk_map
+    return chunk_map, row_edges, col_edges
 
 
-def fit_and_score_rf(X_train: np.ndarray, X_test: np.ndarray,
-                     y_train: np.ndarray, y_test: np.ndarray,
-                     random_seed: int) -> tuple[RandomForestRegressor, np.ndarray, dict]:
+def export_chunk_boundaries(
+    n_rows: int,
+    n_cols: int,
+    row_edges: np.ndarray,
+    col_edges: np.ndarray,
+    crs,
+    transform,
+    out_path: str,
+) -> gpd.GeoDataFrame:
+    """
+    Build a GeoDataFrame of chunk boundary polygons and save as GeoPackage.
+
+    Each chunk is represented as a rectangular polygon in the raster's CRS.
+    The affine *transform* converts (col, row) pixel coordinates to (x, y).
+
+    Returns the GeoDataFrame for optional further use.
+    """
+    records = []
+    chunk_id = 0
+    for r in range(n_rows):
+        for c in range(n_cols):
+            r0, r1 = int(row_edges[r]),  int(row_edges[r + 1])
+            c0, c1 = int(col_edges[c]),  int(col_edges[c + 1])
+
+            # Affine transform: (col, row) → (x, y)
+            x_min, y_max = transform * (c0, r0)   # top-left  pixel corner
+            x_max, y_min = transform * (c1, r1)   # bottom-right pixel corner
+
+            records.append({
+                "chunk_id":  chunk_id,
+                "chunk_row": r,
+                "chunk_col": c,
+                "geometry":  box(x_min, y_min, x_max, y_max),
+            })
+            chunk_id += 1
+
+    gdf = gpd.GeoDataFrame(records, crs=crs)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    gdf.to_file(out_path, driver="GPKG")
+    print(f"  Chunk boundaries saved → {out_path}")
+    return gdf
+
+
+def fit_and_score_rf(
+    X_train: np.ndarray, X_test: np.ndarray,
+    y_train: np.ndarray, y_test: np.ndarray,
+    random_seed: int,
+) -> tuple[RandomForestRegressor, np.ndarray, dict]:
     """Train RF and return model, predictions, and score dictionary."""
     rf = RandomForestRegressor(
         n_estimators=300,
@@ -114,19 +223,154 @@ def fit_and_score_rf(X_train: np.ndarray, X_test: np.ndarray,
     y_pred = rf.predict(X_test)
 
     scores = {
-        "r2": r2_score(y_test, y_pred),
-        "mae": mean_absolute_error(y_test, y_pred),
+        "r2":   r2_score(y_test, y_pred),
+        "mae":  mean_absolute_error(y_test, y_pred),
         "rmse": np.sqrt(mean_squared_error(y_test, y_pred)),
     }
     return rf, y_pred, scores
 
+
+def make_model_plots(
+    label: str,
+    out_dir: str,
+    rf: RandomForestRegressor,
+    y_test: np.ndarray,
+    y_pred: np.ndarray,
+    scores: dict,
+    FEATURES: list[str],
+    feat_labels: list[str],
+    FEATURE_LABELS: dict,
+    X_test: np.ndarray,
+    df_slice: pd.DataFrame,
+    n_sample_total: int,
+):
+    """
+    Generate and save the three standard diagnostic plots for one model.
+
+    Plots produced (all written to *out_dir*):
+      • <label>_analysis.png      – feature importances + predicted vs observed
+      • <label>_scatter.png       – hexbin snow depth vs each predictor
+      • <label>_partial_dep.png   – partial dependence plots
+
+    Parameters
+    ----------
+    label          : short identifier, used as filename prefix and in titles
+    out_dir        : directory where the three PNG files are written
+    rf             : trained RandomForestRegressor
+    y_test / y_pred: hold-out observations and predictions
+    scores         : dict with keys 'r2', 'mae', 'rmse'
+    FEATURES       : list of feature column names (same order as X)
+    feat_labels    : human-readable labels aligned with FEATURES
+    FEATURE_LABELS : mapping feature name → human label (for scatter axes)
+    X_test         : test feature matrix (for partial dependence)
+    df_slice       : DataFrame subset used for this model (for scatter plots)
+    n_sample_total : total sample size (for plot title)
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    n_feat = len(FEATURES)
+    r2   = scores["r2"]
+    rmse = scores["rmse"]
+
+    # ── (a) Feature importances + pred-vs-obs ─────────────────────────────────
+    fig, axes = plt.subplots(1, 2, figsize=(12, max(5, n_feat * 0.5 + 2)))
+    fig.suptitle(
+        f"Snow Depth vs. Topographic Parameters – {label}\n"
+        f"Summer DSM: 2025-08-20  |  Winter DSM: 2026-01-17  |  "
+        f"n = {n_sample_total:,} pixels",
+        fontsize=12,
+    )
+
+    ax = axes[0]
+    feat_imp = pd.Series(rf.feature_importances_, index=feat_labels)
+    feat_imp.sort_values().plot.barh(ax=ax, color="#2196F3")
+    ax.set_title("RF Feature Importances\n(mean decrease in impurity)")
+    ax.set_xlabel("Importance")
+    ax.axvline(0, color="k", lw=0.5)
+
+    ax = axes[1]
+    ax.hexbin(y_test, y_pred, gridsize=60, cmap="Blues", mincnt=1)
+    lim = [0, max(y_test.max(), y_pred.max())]
+    ax.plot(lim, lim, "r--", lw=1.2, label="1:1 line")
+    ax.set_title(f"RF: Predicted vs Observed\nR² = {r2:.3f}  RMSE = {rmse:.3f} m")
+    ax.set_xlabel("Observed snow depth (m)")
+    ax.set_ylabel("Predicted snow depth (m)")
+    ax.legend(fontsize=8)
+
+    plt.tight_layout()
+    path_a = os.path.join(out_dir, f"{label}_analysis.png")
+    plt.savefig(path_a, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"    Model summary plot  → {path_a}")
+
+    # ── (b) Hexbin scatter: snow depth vs each predictor ──────────────────────
+    n_plot_cols = 4
+    n_plot_rows = int(np.ceil(n_feat / n_plot_cols))
+    fig2, axes2 = plt.subplots(
+        n_plot_rows, n_plot_cols,
+        figsize=(n_plot_cols * 4, n_plot_rows * 3.5),
+    )
+    axes2_flat = axes2.ravel() if n_feat > 1 else [axes2]
+    fig2.suptitle(
+        f"Snow Depth vs. Individual Topographic Predictors – {label}",
+        fontsize=12,
+    )
+
+    for i, feat in enumerate(FEATURES):
+        ax = axes2_flat[i]
+        hb = ax.hexbin(
+            df_slice[feat], df_slice["snow_depth"],
+            gridsize=50, cmap="viridis", mincnt=1,
+        )
+        plt.colorbar(hb, ax=ax, label="n pixels")
+        ax.set_xlabel(FEATURE_LABELS[feat], fontsize=9)
+        ax.set_ylabel("Snow depth (m)", fontsize=9)
+        ax.set_title(FEATURE_LABELS[feat], fontsize=9)
+
+    for j in range(n_feat, len(axes2_flat)):
+        axes2_flat[j].set_visible(False)
+
+    plt.tight_layout()
+    path_b = os.path.join(out_dir, f"{label}_scatter.png")
+    plt.savefig(path_b, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"    Scatter grid        → {path_b}")
+
+    # ── (c) Partial dependence plots ──────────────────────────────────────────
+    fig3, axes3 = plt.subplots(
+        n_plot_rows, n_plot_cols,
+        figsize=(n_plot_cols * 4, n_plot_rows * 3.5),
+    )
+    axes3_flat = axes3.ravel() if n_feat > 1 else [axes3]
+    fig3.suptitle(
+        f"Partial Dependence Plots – RF  (R²={r2:.3f})  – {label}",
+        fontsize=12,
+    )
+
+    PartialDependenceDisplay.from_estimator(
+        rf, X_test,
+        features=list(range(n_feat)),
+        feature_names=feat_labels,
+        ax=axes3_flat[:n_feat],
+    )
+    for j in range(n_feat, len(axes3_flat)):
+        axes3_flat[j].set_visible(False)
+
+    plt.tight_layout()
+    path_c = os.path.join(out_dir, f"{label}_partial_dep.png")
+    plt.savefig(path_c, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"    Partial dependence  → {path_c}")
+
+
 def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-    # ─── 1. Load rasters ──────────────────────────────────────────────────────────
+    # ─── 1. Load rasters ──────────────────────────────────────────────────────
     print_section("Loading rasters")
 
-    snow  = load_raster(os.path.join(OUT_DIR,     "snow_depth_model.tif"))
+    snow, snow_crs, snow_transform = load_raster_with_meta(
+        os.path.join(OUT_DIR, "snow_depth_model.tif")
+    )
     slope = load_raster(os.path.join(INDICES_DIR, "slope.tif"))
 
     tpi_arrays = {}
@@ -144,15 +388,35 @@ def main():
     print(f"  Array shape  : {snow.shape}")
     print(f"  Total pixels : {snow.size:,}")
 
-    # ─── 2. Build sample DataFrame ────────────────────────────────────────────────
+    # ─── 2. Build sample DataFrame ────────────────────────────────────────────
     print_section("Building sample")
 
-    chunk_map = chunkize(snow.shape, CHUNK_ROWS, CHUNK_COLS)
+    row_min, row_max, col_min, col_max = valid_data_bbox(snow)
+    print(
+        f"  Valid data extent : rows [{row_min}:{row_max}]  "
+        f"cols [{col_min}:{col_max}]  "
+        f"({row_max - row_min} × {col_max - col_min} px)"
+    )
+
+    chunk_map, row_edges, col_edges = chunkize(
+        snow.shape, CHUNK_ROWS, CHUNK_COLS,
+        row_start=row_min, row_end=row_max,
+        col_start=col_min, col_end=col_max,
+    )
+
+    # Export chunk boundaries as GeoPackage
+    gpkg_path = os.path.join(RESULTS_DIR, "chunk_boundaries.gpkg")
+    export_chunk_boundaries(
+        CHUNK_ROWS, CHUNK_COLS,
+        row_edges, col_edges,
+        snow_crs, snow_transform,
+        gpkg_path,
+    )
 
     df_dict = {
         "snow_depth": snow.ravel(),
-        "slope": slope.ravel(),
-        "chunk_id": chunk_map.ravel(),
+        "slope":      slope.ravel(),
+        "chunk_id":   chunk_map.ravel(),
     }
     for key, arr in tpi_arrays.items():
         df_dict[key] = arr.ravel()
@@ -164,14 +428,15 @@ def main():
     df_valid = df.dropna()
     df_valid = df_valid[
         (df_valid["snow_depth"] >= SNOW_MIN_M) &
-        (df_valid["snow_depth"] <= SNOW_MAX_M)
+        (df_valid["snow_depth"] <= SNOW_MAX_M) &
+        (df_valid["chunk_id"] >= 0)   # exclude pixels outside the chunked region
     ]
     print(f"  Valid pixels after filter : {len(df_valid):,}")
 
     # Stratified sample: equal number of rows per snow-depth decile
     #   → ensures rare deep-snow pixels are represented
     df_valid["_decile"] = pd.qcut(df_valid["snow_depth"], q=10, labels=False, duplicates="drop")
-    per_bin = max(1, N_SAMPLE // df_valid["_decile"].nunique())  # rows to draw per decile
+    per_bin = max(1, N_SAMPLE // df_valid["_decile"].nunique())
     df_sample = (
         df_valid
         .groupby("_decile", group_keys=False)
@@ -189,8 +454,8 @@ def main():
     FEATURE_LABELS = {"slope": "Slope (°)"}
     for r in TPI_RADII_PX:
         FEATURE_LABELS[f"tpi_{r}px"] = f"TPI {r}px ({r*0.10:.0f} m)"
-    for label, deg in WIND_DIRECTIONS.items():
-        FEATURE_LABELS[f"wi_{label}"] = f"WI {label} ({deg}°)"
+    for lbl, deg in WIND_DIRECTIONS.items():
+        FEATURE_LABELS[f"wi_{lbl}"] = f"WI {lbl} ({deg}°)"
 
     feat_labels = [FEATURE_LABELS[f] for f in FEATURES]
 
@@ -201,15 +466,15 @@ def main():
         X, y, test_size=0.2, random_state=RANDOM_SEED
     )
 
-    # ─── 3. Random Forest ─────────────────────────────────────────────────────────
-    print_section("Random Forest")
+    # ─── 3. Global Random Forest ──────────────────────────────────────────────
+    print_section("Global Random Forest")
 
     rf, y_pred_rf, global_scores = fit_and_score_rf(
         X_train, X_test, y_train, y_test, RANDOM_SEED
     )
 
-    r2_rf = global_scores["r2"]
-    mae_rf = global_scores["mae"]
+    r2_rf   = global_scores["r2"]
+    mae_rf  = global_scores["mae"]
     rmse_rf = global_scores["rmse"]
 
     print(f"  R²   = {r2_rf:.4f}")
@@ -219,12 +484,40 @@ def main():
     for feat, imp in sorted(zip(FEATURES, rf.feature_importances_), key=lambda x: -x[1]):
         print(f"    {feat:20s}: {imp:.4f}")
 
-    # ─── 3b. Chunk-wise Random Forest experiment ────────────────────────────────
+    # Global plots
+    make_model_plots(
+        label="global",
+        out_dir=RESULTS_DIR,
+        rf=rf,
+        y_test=y_test,
+        y_pred=y_pred_rf,
+        scores=global_scores,
+        FEATURES=FEATURES,
+        feat_labels=feat_labels,
+        FEATURE_LABELS=FEATURE_LABELS,
+        X_test=X_test,
+        df_slice=df_sample,
+        n_sample_total=len(df_sample),
+    )
+
+    # Global summary CSV
+    summary = pd.DataFrame({
+        "feature"      : FEATURES,
+        "feature_label": feat_labels,
+        "rf_importance": rf.feature_importances_,
+    })
+    summary_path = os.path.join(RESULTS_DIR, "snow_topo_summary.csv")
+    summary.to_csv(summary_path, index=False)
+    print(f"  Summary table saved → {summary_path}")
+
+    # ─── 3b. Chunk-wise Random Forest ────────────────────────────────────────
     chunk_summary = None
     if RUN_CHUNK_EXPERIMENT:
         print_section("Chunk-wise Random Forest")
         print(f"  Chunk grid              : {CHUNK_ROWS} x {CHUNK_COLS}")
         print(f"  Min samples per chunk   : {MIN_CHUNK_SAMPLES:,}")
+
+        chunks_out_dir = os.path.join(RESULTS_DIR, "chunks")
 
         y_true_all = []
         y_pred_all = []
@@ -232,12 +525,15 @@ def main():
 
         for chunk_id, g in df_sample.groupby("chunk_id"):
             n_chunk = len(g)
+            print(f"\n  ── chunk {int(chunk_id):02d}  (n = {n_chunk:,}) ──")
+
             if n_chunk < MIN_CHUNK_SAMPLES:
+                print(f"     Skipped (< {MIN_CHUNK_SAMPLES:,} samples)")
                 chunk_rows.append({
                     "chunk_id": int(chunk_id),
                     "n_samples": int(n_chunk),
-                    "r2": np.nan,
-                    "mae": np.nan,
+                    "r2":   np.nan,
+                    "mae":  np.nan,
                     "rmse": np.nan,
                     "status": "skipped_too_small",
                 })
@@ -248,8 +544,43 @@ def main():
             Xc_train, Xc_test, yc_train, yc_test = train_test_split(
                 Xc, yc, test_size=0.2, random_state=RANDOM_SEED
             )
-            _, y_chunk_pred, chunk_scores = fit_and_score_rf(
+
+            rf_chunk, y_chunk_pred, chunk_scores = fit_and_score_rf(
                 Xc_train, Xc_test, yc_train, yc_test, RANDOM_SEED
+            )
+
+            print(
+                f"     R²={chunk_scores['r2']:.4f}  "
+                f"MAE={chunk_scores['mae']:.4f} m  "
+                f"RMSE={chunk_scores['rmse']:.4f} m"
+            )
+
+            # Per-chunk plots in own subdirectory
+            chunk_plot_dir = os.path.join(chunks_out_dir, f"chunk_{int(chunk_id):02d}")
+            make_model_plots(
+                label=f"chunk_{int(chunk_id):02d}",
+                out_dir=chunk_plot_dir,
+                rf=rf_chunk,
+                y_test=yc_test,
+                y_pred=y_chunk_pred,
+                scores=chunk_scores,
+                FEATURES=FEATURES,
+                feat_labels=feat_labels,
+                FEATURE_LABELS=FEATURE_LABELS,
+                X_test=Xc_test,
+                df_slice=g,
+                n_sample_total=n_chunk,
+            )
+
+            # Per-chunk feature importance CSV
+            chunk_imp = pd.DataFrame({
+                "feature"      : FEATURES,
+                "feature_label": feat_labels,
+                "rf_importance": rf_chunk.feature_importances_,
+            })
+            chunk_imp.to_csv(
+                os.path.join(chunk_plot_dir, f"chunk_{int(chunk_id):02d}_summary.csv"),
+                index=False,
             )
 
             y_true_all.append(yc_test)
@@ -257,28 +588,36 @@ def main():
             chunk_rows.append({
                 "chunk_id": int(chunk_id),
                 "n_samples": int(n_chunk),
-                "r2": chunk_scores["r2"],
-                "mae": chunk_scores["mae"],
+                "r2":   chunk_scores["r2"],
+                "mae":  chunk_scores["mae"],
                 "rmse": chunk_scores["rmse"],
                 "status": "ok",
             })
 
-            print(
-                f"  chunk={int(chunk_id):2d}  n={n_chunk:9,}  "
-                f"R²={chunk_scores['r2']:.4f}  RMSE={chunk_scores['rmse']:.4f} m"
-            )
-
         chunk_summary = pd.DataFrame(chunk_rows).sort_values("chunk_id").reset_index(drop=True)
         chunk_summary_path = os.path.join(RESULTS_DIR, "snow_topo_chunk_summary.csv")
         chunk_summary.to_csv(chunk_summary_path, index=False)
-        print(f"\n  Chunk summary saved      → {chunk_summary_path}")
+        print(f"\n  Chunk summary saved → {chunk_summary_path}")
+
+        # Annotate GeoPackage with chunk metrics
+        try:
+            gdf = gpd.read_file(gpkg_path)
+            gdf = gdf.merge(
+                chunk_summary[["chunk_id", "n_samples", "r2", "mae", "rmse", "status"]],
+                on="chunk_id",
+                how="left",
+            )
+            gdf.to_file(gpkg_path, driver="GPKG")
+            print(f"  Chunk boundaries updated with metrics → {gpkg_path}")
+        except Exception as e:
+            print(f"  Warning: could not update GeoPackage with metrics: {e}")
 
         valid_eval = chunk_summary[chunk_summary["status"] == "ok"]
         if len(valid_eval) > 0 and y_true_all:
             y_true_concat = np.concatenate(y_true_all)
             y_pred_concat = np.concatenate(y_pred_all)
-            chunk_global_r2 = r2_score(y_true_concat, y_pred_concat)
-            chunk_global_mae = mean_absolute_error(y_true_concat, y_pred_concat)
+            chunk_global_r2   = r2_score(y_true_concat, y_pred_concat)
+            chunk_global_mae  = mean_absolute_error(y_true_concat, y_pred_concat)
             chunk_global_rmse = np.sqrt(mean_squared_error(y_true_concat, y_pred_concat))
 
             print("\n  Global vs chunked comparison")
@@ -289,122 +628,20 @@ def main():
             )
 
             cmp_df = pd.DataFrame([
-                {"model": "global", "r2": r2_rf, "mae": mae_rf, "rmse": rmse_rf},
-                {
-                    "model": "chunked_aggregate",
-                    "r2": chunk_global_r2,
-                    "mae": chunk_global_mae,
-                    "rmse": chunk_global_rmse,
-                },
+                {"model": "global",           "r2": r2_rf,           "mae": mae_rf,           "rmse": rmse_rf},
+                {"model": "chunked_aggregate", "r2": chunk_global_r2, "mae": chunk_global_mae, "rmse": chunk_global_rmse},
             ])
             cmp_path = os.path.join(RESULTS_DIR, "snow_topo_global_vs_chunked.csv")
             cmp_df.to_csv(cmp_path, index=False)
-            print(f"  Comparison table saved   → {cmp_path}")
+            print(f"  Comparison table saved → {cmp_path}")
         else:
             print("  No chunk had enough data for evaluation.")
 
-    # ─── 4. Summary CSV ───────────────────────────────────────────────────────────
-    summary = pd.DataFrame({
-        "feature"      : FEATURES,
-        "feature_label": feat_labels,
-        "rf_importance": rf.feature_importances_,
-    })
-    summary_path = os.path.join(RESULTS_DIR, "snow_topo_summary.csv")
-    summary.to_csv(summary_path, index=False)
-    print(f"\nSummary table saved → {summary_path}")
-
-    # ─── 5. Plots ─────────────────────────────────────────────────────────────────
-    print_section("Plotting")
-
-    n_feat = len(FEATURES)
-
-    # ── 5a. Feature importances + pred-vs-obs ─────────────────────────────────────
-    fig, axes = plt.subplots(1, 2, figsize=(12, max(5, n_feat * 0.5 + 2)))
-    fig.suptitle(
-        "Snow Depth vs. Topographic Parameters – Zugspitze UAV\n"
-        f"Summer DSM: 2025-08-20  |  Winter DSM: 2026-01-17  |  "
-        f"n = {len(df_sample):,} pixels",
-        fontsize=12,
-    )
-
-    # RF feature importances
-    ax = axes[0]
-    feat_imp = pd.Series(rf.feature_importances_, index=feat_labels)
-    feat_imp.sort_values().plot.barh(ax=ax, color="#2196F3")
-    ax.set_title("RF Feature Importances\n(mean decrease in impurity)")
-    ax.set_xlabel("Importance")
-    ax.axvline(0, color="k", lw=0.5)
-
-    # Predicted vs observed
-    ax = axes[1]
-    ax.hexbin(y_test, y_pred_rf, gridsize=60, cmap="Blues", mincnt=1)
-    lim = [0, max(y_test.max(), y_pred_rf.max())]
-    ax.plot(lim, lim, "r--", lw=1.2, label="1:1 line")
-    ax.set_title(f"RF: Predicted vs Observed\nR² = {r2_rf:.3f}  RMSE = {rmse_rf:.3f} m")
-    ax.set_xlabel("Observed snow depth (m)")
-    ax.set_ylabel("Predicted snow depth (m)")
-    ax.legend(fontsize=8)
-
-    plt.tight_layout()
-    plot_path = os.path.join(RESULTS_DIR, "snow_topo_analysis.png")
-    plt.savefig(plot_path, dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  Model summary plot saved → {plot_path}")
-
-    # ── 5b. Hexbin scatter: snow depth vs each predictor ─────────────────────────
-    n_cols  = 4
-    n_rows  = int(np.ceil(n_feat / n_cols))
-    fig2, axes2 = plt.subplots(n_rows, n_cols,
-                                figsize=(n_cols * 4, n_rows * 3.5))
-    axes2_flat = axes2.ravel() if n_feat > 1 else [axes2]
-    fig2.suptitle("Snow Depth vs. Individual Topographic Predictors", fontsize=12)
-
-    for i, feat in enumerate(FEATURES):
-        ax = axes2_flat[i]
-        hb = ax.hexbin(df_sample[feat], df_sample["snow_depth"],
-                       gridsize=50, cmap="viridis", mincnt=1)
-        plt.colorbar(hb, ax=ax, label="n pixels")
-        ax.set_xlabel(FEATURE_LABELS[feat], fontsize=9)
-        ax.set_ylabel("Snow depth (m)", fontsize=9)
-        ax.set_title(FEATURE_LABELS[feat], fontsize=9)
-
-    # hide unused axes
-    for j in range(n_feat, len(axes2_flat)):
-        axes2_flat[j].set_visible(False)
-
-    plt.tight_layout()
-    scatter_path = os.path.join(RESULTS_DIR, "snow_topo_scatter.png")
-    plt.savefig(scatter_path, dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  Scatter grid saved → {scatter_path}")
-
-    # ── 5c. Partial dependence plots (RF) ─────────────────────────────────────────
-    fig3, axes3 = plt.subplots(n_rows, n_cols,
-                                figsize=(n_cols * 4, n_rows * 3.5))
-    axes3_flat = axes3.ravel() if n_feat > 1 else [axes3]
-    fig3.suptitle(f"Partial Dependence Plots – Random Forest  (R²={r2_rf:.3f})",
-                  fontsize=12)
-
-    PartialDependenceDisplay.from_estimator(
-        rf, X_test,
-        features=list(range(n_feat)),
-        feature_names=feat_labels,
-        ax=axes3_flat[:n_feat],
-    )
-    for j in range(n_feat, len(axes3_flat)):
-        axes3_flat[j].set_visible(False)
-
-    plt.tight_layout()
-    pdp_path = os.path.join(RESULTS_DIR, "partial_dependence.png")
-    plt.savefig(pdp_path, dpi=150, bbox_inches="tight")
-    plt.close()
-    print(f"  Partial dependence plot saved → {pdp_path}")
-
-    # ─── Done ─────────────────────────────────────────────────────────────────────
+    # ─── Done ─────────────────────────────────────────────────────────────────
     print_section("Results summary")
-    print(f"  Random Forest R²  = {r2_rf:.4f}")
-    print(f"  RMSE              = {rmse_rf:.4f} m")
-    print(f"  Most important predictor: {FEATURE_LABELS[FEATURES[np.argmax(rf.feature_importances_)]]}")
+    print(f"  Global Random Forest R²  = {r2_rf:.4f}")
+    print(f"  RMSE                     = {rmse_rf:.4f} m")
+    print(f"  Most important predictor : {FEATURE_LABELS[FEATURES[np.argmax(rf.feature_importances_)]]}")
     print(f"\nAll outputs in: {RESULTS_DIR}")
 
 

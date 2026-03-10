@@ -4,17 +4,17 @@
 #SBATCH --exclude=hpdar01c03s04
 #SBATCH --account=pn39sa-c
 #SBATCH --partition=hpda2_compute
-#SBATCH --time=04:00:00
+#SBATCH --time=05:00:00
 #SBATCH --nodes=1
 #SBATCH --export=NONE
 #SBATCH --get-user-env
-#SBATCH --cpus-per-task=30
+#SBATCH --cpus-per-task=25
 #SBATCH --mem=300GB
 #SBATCH --output=/dss/dsstbyfs02/pn49ci/pn49ci-dss-0026/di54xen/experiments/UAV_Zugspitze/slurm_logs/%j_out_log.out
 #SBATCH --error=/dss/dsstbyfs02/pn49ci/pn49ci-dss-0026/di54xen/experiments/UAV_Zugspitze/slurm_logs/%j_err_log.err
 # optional:
-# #SBATCH --mail-type=END
-# #SBATCH --mail-user=kjelldre.wundram@gmail.com
+#SBATCH --mail-type=END
+#SBATCH --mail-user=kjelldre.wundram@gmail.com
 
 # Setup
 logs="$WORK/logs"
@@ -26,8 +26,9 @@ source /dss/dsshome1/02/di54xen/projects/zugspitze/UAV_Zugspitze/.venv/bin/activ
 
 
 # Run training
-uv run topo_analysis 
-
+echo "[SLURM] Running topo_analysis with UV..."
+PYTHONUNBUFFERED=1 uv run topo_analysis
+echo "[SLURM] UV done."
 # Organize logs into dated subdirectories
 LOG_BASE="/dss/dsstbyfs02/pn49ci/pn49ci-dss-0026/di54xen/experiments/UAV_Zugspitze/slurm_logs"
 LOG_DATE=$(date +%Y-%m-%d)
