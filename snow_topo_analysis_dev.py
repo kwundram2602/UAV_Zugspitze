@@ -64,7 +64,6 @@ RANDOM_SEED = 42
 # Snow depth filter (remove outliers / artefacts)
 SNOW_MIN_M = 0.05   # below this → likely measurement noise, excluded
 SNOW_MAX_M = 6.00   # above this → likely DSM artefact, excluded
-
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def load_raster(path: str) -> np.ndarray:

@@ -6,7 +6,7 @@ Statistical analysis of snow depth vs. topographic parameters.
 Workflow:
   1. Load snow depth model + topographic indices (from topo_indices.py output)
   2. Build a random pixel sample (stratified by snow depth quantile)
-  3. Fit Random Forest  → feature importance, partial dependence
+  3. Fit Random Forest or HistGradientBoostingRegressor → feature importance, partial dependence
   4. Export plots and a summary CSV
 
 Prerequisite outputs:
@@ -19,6 +19,10 @@ Prerequisite outputs:
     out/indices/windward_index_W.tif   (wind from 270°)
     out/indices/windward_index_E.tif   (wind from  90°)
     out/indices/windward_index_SE.tif  (wind from 135°)
+    out/indices/dir_relief_E.tif       (directional relief E)
+    out/indices/dir_relief_SE.tif      (directional relief SE)
+    out/indices/dir_relief_SW.tif      (directional relief SW)
+    out/indices/dir_relief_W.tif       (directional relief W)
 
 Analysis results are written to   out/analysis/
 
@@ -35,16 +39,15 @@ matplotlib.use("Agg")           # headless; change to "TkAgg" if you want a wind
 import matplotlib.pyplot as plt
 
 from shapely.geometry import box
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, HistGradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
-from sklearn.inspection import PartialDependenceDisplay
+from sklearn.inspection import PartialDependenceDisplay,permutation_importance
 from pathlib import Path
-
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 HERE        = Path(__file__).resolve().parent
-OUT_DIR     = HERE / "out_chunked"
+OUT_DIR     = HERE / "out"
 INDICES_DIR = os.path.join(OUT_DIR, "indices")    # rasters from topo_indices.py
 RESULTS_DIR = os.path.join(OUT_DIR, "analysis")   # plots + CSV from this script
 
@@ -52,17 +55,23 @@ RESULTS_DIR = os.path.join(OUT_DIR, "analysis")   # plots + CSV from this script
 TPI_RADII_PX = [50, 250, 500]   # → 5 m, 25 m, 50 m at 10 cm resolution
 
 # Wind directions to include (must match labels from topo_indices.py)
-WIND_DIRECTIONS = {"SW": 225, "W": 270, "E": 90, "SE": 135}
+WIND_DIRECTIONS = {"SW": 225, "E": 90, "SE": 135}
+
+# Directional relief directions (must match dir_relief_*.tif filenames)
+DIR_RELIEF_DIRECTIONS = ["E", "SE", "SW", "W"]
+
+# Model to use: "rf" (RandomForestRegressor) or "hgbr" (HistGradientBoostingRegressor)
+MODEL_TYPE = "hgbr"
 
 # Sampling
-N_SAMPLE    = 5_000_000   # max pixels drawn for modelling
+N_SAMPLE    = 1_000_000   # max pixels drawn for modelling
 RANDOM_SEED = 42
 
 # Spatial chunk experiment
 RUN_CHUNK_EXPERIMENT = True
 CHUNK_ROWS = 4
 CHUNK_COLS = 4
-MIN_CHUNK_SAMPLES = 120_000
+MIN_CHUNK_SAMPLES = 50_000
 
 # Snow depth filter (remove outliers / artefacts)
 SNOW_MIN_M = 0.04   # below this → likely measurement noise, excluded
@@ -206,34 +215,50 @@ def export_chunk_boundaries(
     return gdf
 
 
-def fit_and_score_rf(
+def fit_and_score(
     X_train: np.ndarray, X_test: np.ndarray,
     y_train: np.ndarray, y_test: np.ndarray,
     random_seed: int,
-) -> tuple[RandomForestRegressor, np.ndarray, dict]:
-    """Train RF and return model, predictions, and score dictionary."""
-    rf = RandomForestRegressor(
-        n_estimators=300,
-        max_depth=12,
-        min_samples_leaf=20,
-        n_jobs=-1,
-        random_state=random_seed,
-    )
-    rf.fit(X_train, y_train)
-    y_pred = rf.predict(X_test)
+    model_type: str = "rf",
+) -> tuple:
+    """Train a model and return (model, predictions, score dict).
+
+    Parameters
+    ----------
+    model_type : "rf"   → RandomForestRegressor
+                 "hgbr" → HistGradientBoostingRegressor
+    """
+    if model_type == "hgbr":
+        model = HistGradientBoostingRegressor(
+            max_iter=300,
+            max_depth=12,
+            min_samples_leaf=20,
+            random_state=random_seed,
+        )
+    else:  # default: rf
+        model = RandomForestRegressor(
+            n_estimators=300,
+            max_depth=12,
+            min_samples_leaf=20,
+            n_jobs=-1,
+            random_state=random_seed,
+        )
+
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
 
     scores = {
         "r2":   r2_score(y_test, y_pred),
         "mae":  mean_absolute_error(y_test, y_pred),
         "rmse": np.sqrt(mean_squared_error(y_test, y_pred)),
     }
-    return rf, y_pred, scores
+    return model, y_pred, scores
 
 
 def make_model_plots(
     label: str,
     out_dir: str,
-    rf: RandomForestRegressor,
+    model,
     y_test: np.ndarray,
     y_pred: np.ndarray,
     scores: dict,
@@ -243,6 +268,7 @@ def make_model_plots(
     X_test: np.ndarray,
     df_slice: pd.DataFrame,
     n_sample_total: int,
+    model_type: str = "rf",
 ):
     """
     Generate and save the three standard diagnostic plots for one model.
@@ -256,7 +282,7 @@ def make_model_plots(
     ----------
     label          : short identifier, used as filename prefix and in titles
     out_dir        : directory where the three PNG files are written
-    rf             : trained RandomForestRegressor
+    model          : trained model (RandomForestRegressor or HistGradientBoostingRegressor)
     y_test / y_pred: hold-out observations and predictions
     scores         : dict with keys 'r2', 'mae', 'rmse'
     FEATURES       : list of feature column names (same order as X)
@@ -265,11 +291,28 @@ def make_model_plots(
     X_test         : test feature matrix (for partial dependence)
     df_slice       : DataFrame subset used for this model (for scatter plots)
     n_sample_total : total sample size (for plot title)
+    model_type     : "rf" or "hgbr" (affects importance method and labels)
     """
     os.makedirs(out_dir, exist_ok=True)
     n_feat = len(FEATURES)
     r2   = scores["r2"]
     rmse = scores["rmse"]
+    model_name = "RF" if model_type == "rf" else "HGBR"
+
+    # ── Feature importances ────────────────────────────────────────────────────
+    # RF: built-in impurity-based importances
+    # HGBR: permutation importances (no built-in .feature_importances_ guarantee)
+    if model_type == "rf":
+        imp_values = model.feature_importances_
+        imp_title  = "RF Feature Importances\n(mean decrease in impurity)"
+    else:
+        print("    Computing permutation importances for HGBR …")
+        perm = permutation_importance(
+            model, X_test, y_test,
+            n_repeats=10, random_state=42, n_jobs=-1,
+        )
+        imp_values = perm.importances_mean
+        imp_title  = "HGBR Feature Importances\n(permutation, mean ± std)"
 
     # ── (a) Feature importances + pred-vs-obs ─────────────────────────────────
     fig, axes = plt.subplots(1, 2, figsize=(12, max(5, n_feat * 0.5 + 2)))
@@ -281,9 +324,9 @@ def make_model_plots(
     )
 
     ax = axes[0]
-    feat_imp = pd.Series(rf.feature_importances_, index=feat_labels)
+    feat_imp = pd.Series(imp_values, index=feat_labels)
     feat_imp.sort_values().plot.barh(ax=ax, color="#2196F3")
-    ax.set_title("RF Feature Importances\n(mean decrease in impurity)")
+    ax.set_title(imp_title)
     ax.set_xlabel("Importance")
     ax.axvline(0, color="k", lw=0.5)
 
@@ -291,7 +334,7 @@ def make_model_plots(
     ax.hexbin(y_test, y_pred, gridsize=60, cmap="Blues", mincnt=1)
     lim = [0, max(y_test.max(), y_pred.max())]
     ax.plot(lim, lim, "r--", lw=1.2, label="1:1 line")
-    ax.set_title(f"RF: Predicted vs Observed\nR² = {r2:.3f}  RMSE = {rmse:.3f} m")
+    ax.set_title(f"{model_name}: Predicted vs Observed\nR² = {r2:.3f}  RMSE = {rmse:.3f} m")
     ax.set_xlabel("Observed snow depth (m)")
     ax.set_ylabel("Predicted snow depth (m)")
     ax.legend(fontsize=8)
@@ -342,12 +385,12 @@ def make_model_plots(
     )
     axes3_flat = axes3.ravel() if n_feat > 1 else [axes3]
     fig3.suptitle(
-        f"Partial Dependence Plots – RF  (R²={r2:.3f})  – {label}",
+        f"Partial Dependence Plots – {model_name}  (R²={r2:.3f})  – {label}",
         fontsize=12,
     )
 
     PartialDependenceDisplay.from_estimator(
-        rf, X_test,
+        model, X_test,
         features=list(range(n_feat)),
         feature_names=feat_labels,
         ax=axes3_flat[:n_feat],
@@ -384,6 +427,12 @@ def main():
         key = f"wi_{label}"
         wi_arrays[key] = load_raster(os.path.join(INDICES_DIR, f"windward_index_{label}.tif"))
         print(f"  Loaded indices/windward_index_{label}.tif")
+
+    dr_arrays = {}
+    for lbl in DIR_RELIEF_DIRECTIONS:
+        key = f"dr_{lbl}"
+        dr_arrays[key] = load_raster(os.path.join(INDICES_DIR, f"dir_relief_{lbl}.tif"))
+        print(f"  Loaded indices/dir_relief_{lbl}.tif")
 
     print(f"  Array shape  : {snow.shape}")
     print(f"  Total pixels : {snow.size:,}")
@@ -422,6 +471,8 @@ def main():
         df_dict[key] = arr.ravel()
     for key, arr in wi_arrays.items():
         df_dict[key] = arr.ravel()
+    for key, arr in dr_arrays.items():
+        df_dict[key] = arr.ravel()
 
     df = pd.DataFrame(df_dict)
 
@@ -449,6 +500,7 @@ def main():
         ["slope"]
         + list(tpi_arrays.keys())
         + list(wi_arrays.keys())
+        + list(dr_arrays.keys())
     )
 
     FEATURE_LABELS = {"slope": "Slope (°)"}
@@ -456,6 +508,8 @@ def main():
         FEATURE_LABELS[f"tpi_{r}px"] = f"TPI {r}px ({r*0.10:.0f} m)"
     for lbl, deg in WIND_DIRECTIONS.items():
         FEATURE_LABELS[f"wi_{lbl}"] = f"WI {lbl} ({deg}°)"
+    for lbl in DIR_RELIEF_DIRECTIONS:
+        FEATURE_LABELS[f"dr_{lbl}"] = f"Dir. Relief {lbl}"
 
     feat_labels = [FEATURE_LABELS[f] for f in FEATURES]
 
@@ -466,11 +520,12 @@ def main():
         X, y, test_size=0.2, random_state=RANDOM_SEED
     )
 
-    # ─── 3. Global Random Forest ──────────────────────────────────────────────
-    print_section("Global Random Forest")
+    # ─── 3. Global model ──────────────────────────────────────────────────────
+    model_name = "RF" if MODEL_TYPE == "rf" else "HGBR"
+    print_section(f"Global {model_name}")
 
-    rf, y_pred_rf, global_scores = fit_and_score_rf(
-        X_train, X_test, y_train, y_test, RANDOM_SEED
+    global_model, y_pred_global, global_scores = fit_and_score(
+        X_train, X_test, y_train, y_test, RANDOM_SEED, model_type=MODEL_TYPE
     )
 
     r2_rf   = global_scores["r2"]
@@ -480,17 +535,19 @@ def main():
     print(f"  R²   = {r2_rf:.4f}")
     print(f"  MAE  = {mae_rf:.4f} m")
     print(f"  RMSE = {rmse_rf:.4f} m")
-    print(f"  Feature importances:")
-    for feat, imp in sorted(zip(FEATURES, rf.feature_importances_), key=lambda x: -x[1]):
-        print(f"    {feat:20s}: {imp:.4f}")
+
+    if MODEL_TYPE == "rf":
+        print(f"  Feature importances:")
+        for feat, imp in sorted(zip(FEATURES, global_model.feature_importances_), key=lambda x: -x[1]):
+            print(f"    {feat:20s}: {imp:.4f}")
 
     # Global plots
     make_model_plots(
         label="global",
         out_dir=RESULTS_DIR,
-        rf=rf,
+        model=global_model,
         y_test=y_test,
-        y_pred=y_pred_rf,
+        y_pred=y_pred_global,
         scores=global_scores,
         FEATURES=FEATURES,
         feat_labels=feat_labels,
@@ -498,22 +555,29 @@ def main():
         X_test=X_test,
         df_slice=df_sample,
         n_sample_total=len(df_sample),
+        model_type=MODEL_TYPE,
     )
 
-    # Global summary CSV
+    # Global summary CSV — importance column computed inside make_model_plots already;
+    # here we store whatever is available (impurity for RF, NaN placeholder for HGBR)
+    if MODEL_TYPE == "rf":
+        imp_col = global_model.feature_importances_
+    else:
+        imp_col = [np.nan] * len(FEATURES)
+
     summary = pd.DataFrame({
         "feature"      : FEATURES,
         "feature_label": feat_labels,
-        "rf_importance": rf.feature_importances_,
+        "importance"   : imp_col,
     })
     summary_path = os.path.join(RESULTS_DIR, "snow_topo_summary.csv")
     summary.to_csv(summary_path, index=False)
     print(f"  Summary table saved → {summary_path}")
 
-    # ─── 3b. Chunk-wise Random Forest ────────────────────────────────────────
+    # ─── 3b. Chunk-wise model ─────────────────────────────────────────────────
     chunk_summary = None
     if RUN_CHUNK_EXPERIMENT:
-        print_section("Chunk-wise Random Forest")
+        print_section(f"Chunk-wise {model_name}")
         print(f"  Chunk grid              : {CHUNK_ROWS} x {CHUNK_COLS}")
         print(f"  Min samples per chunk   : {MIN_CHUNK_SAMPLES:,}")
 
@@ -545,8 +609,8 @@ def main():
                 Xc, yc, test_size=0.2, random_state=RANDOM_SEED
             )
 
-            rf_chunk, y_chunk_pred, chunk_scores = fit_and_score_rf(
-                Xc_train, Xc_test, yc_train, yc_test, RANDOM_SEED
+            chunk_model, y_chunk_pred, chunk_scores = fit_and_score(
+                Xc_train, Xc_test, yc_train, yc_test, RANDOM_SEED, model_type=MODEL_TYPE
             )
 
             print(
@@ -560,7 +624,7 @@ def main():
             make_model_plots(
                 label=f"chunk_{int(chunk_id):02d}",
                 out_dir=chunk_plot_dir,
-                rf=rf_chunk,
+                model=chunk_model,
                 y_test=yc_test,
                 y_pred=y_chunk_pred,
                 scores=chunk_scores,
@@ -570,13 +634,19 @@ def main():
                 X_test=Xc_test,
                 df_slice=g,
                 n_sample_total=n_chunk,
+                model_type=MODEL_TYPE,
             )
 
             # Per-chunk feature importance CSV
+            if MODEL_TYPE == "rf":
+                chunk_imp_col = chunk_model.feature_importances_
+            else:
+                chunk_imp_col = [np.nan] * len(FEATURES)
+
             chunk_imp = pd.DataFrame({
                 "feature"      : FEATURES,
                 "feature_label": feat_labels,
-                "rf_importance": rf_chunk.feature_importances_,
+                "importance"   : chunk_imp_col,
             })
             chunk_imp.to_csv(
                 os.path.join(chunk_plot_dir, f"chunk_{int(chunk_id):02d}_summary.csv"),
@@ -621,9 +691,9 @@ def main():
             chunk_global_rmse = np.sqrt(mean_squared_error(y_true_concat, y_pred_concat))
 
             print("\n  Global vs chunked comparison")
-            print(f"    Global RF     : R²={r2_rf:.4f}  MAE={mae_rf:.4f} m  RMSE={rmse_rf:.4f} m")
+            print(f"    Global {model_name:<6}: R²={r2_rf:.4f}  MAE={mae_rf:.4f} m  RMSE={rmse_rf:.4f} m")
             print(
-                f"    Chunked RF    : R²={chunk_global_r2:.4f}  "
+                f"    Chunked {model_name:<5}: R²={chunk_global_r2:.4f}  "
                 f"MAE={chunk_global_mae:.4f} m  RMSE={chunk_global_rmse:.4f} m"
             )
 
@@ -639,9 +709,12 @@ def main():
 
     # ─── Done ─────────────────────────────────────────────────────────────────
     print_section("Results summary")
-    print(f"  Global Random Forest R²  = {r2_rf:.4f}")
+    print(f"  Model type               : {MODEL_TYPE.upper()}")
+    print(f"  Global {model_name} R²          = {r2_rf:.4f}")
     print(f"  RMSE                     = {rmse_rf:.4f} m")
-    print(f"  Most important predictor : {FEATURE_LABELS[FEATURES[np.argmax(rf.feature_importances_)]]}")
+    if MODEL_TYPE == "rf":
+        best_feat = FEATURE_LABELS[FEATURES[np.argmax(global_model.feature_importances_)]]
+        print(f"  Most important predictor : {best_feat}")
     print(f"\nAll outputs in: {RESULTS_DIR}")
 
 
