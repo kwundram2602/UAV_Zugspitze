@@ -1,6 +1,12 @@
 uas_data
 out
+out2
 .vscode
 .venv
 .ruff_cache
 uv.lock
+Poster_UAV/build
+*.egg-info
+dist
+__pycache__
+hpc/user/*

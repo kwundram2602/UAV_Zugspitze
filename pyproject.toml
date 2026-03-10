@@ -14,3 +14,12 @@ dependencies = [
     "statsmodels>=0.14.6",
     "whitebox-workflows>=1.3.5",
 ]
+
+[project.scripts]
+topo_analysis = "snow_topo_analysis:main"
+
+[tool.setuptools]
+py-modules = ["snow_topo_analysis", "topo_indices", "snow_depth_model"]
+
+[tool.uv]
+package = true
