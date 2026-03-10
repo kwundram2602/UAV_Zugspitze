@@ -19,8 +19,9 @@ import numpy as np
 import whitebox_workflows as wbw
 from whitebox_workflows import WbEnvironment
 import rioxarray as riox
-import whitebox as wbt
+import whitebox
 
+wbt = whitebox.WhiteboxTools()
 # ─── User configuration ───────────────────────────────────────────────────────
 def main():
     HERE        = Path(__file__).resolve().parent
@@ -113,7 +114,9 @@ def main():
         print(f"  → out/indices/{out_name}")
 
     # ── 5. Directional Relief for each wind direction ───────────────────────────────
+    print("\nComputing directional relief for each wind direction …")
     for label, azimuth in WIND_DIRECTIONS.items():
+        print(f"  Directional Relief for {label} ({azimuth}°) …")
         output_path = os.path.join(INDICES_DIR, f"dir_relief_{label}.tif")
         
         # Whitebox Tool: Directional Relief
