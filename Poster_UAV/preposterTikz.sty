@@ -1,10 +1,10 @@
 \usepackage[usenames,dvipsnames]{xcolor}
-\usepackage[brazil]{babel}
+\usepackage[english]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage[centertags]{amsmath}
 \usepackage{multirow,multicol}
 %\usepackage{colortbl}
-\usepackage{lipsum} %sugest\~ao de texto
+\usepackage{lipsum} % text suggestion
 \usepackage{geometry}
 \usepackage{standalone}
 \usepackage{tikz,pgfplots,tikz-3dplot}
@@ -18,12 +18,12 @@
 \usetikzlibrary{arrows.meta}
 \pagestyle{plain}
 
-%%Transformando tudo em branco
-\renewcommand{\thesection}{\textcolor{white}{\arabic{section}}}
-\renewcommand{\thesubsection}{\textcolor{white}{\arabic{section}.\arabic{subsection}}}
+%% Render section numbering in white.
+\renewcommand{\thesection}{\textcolor{PosterWhite}{\arabic{section}}}
+\renewcommand{\thesubsection}{\textcolor{PosterWhite}{\arabic{section}.\arabic{subsection}}}
 
-%%Definindo cores
-\definecolor{BoxCol}{RGB}{0,60,100} %azul
+%% Define color palette.
+\definecolor{BoxCol}{RGB}{0, 65, 136} %azul
 %paleta: Citrus Fruits
 %http://www.colourlovers.com/palette/1653416/Citrus_Fruits
 \definecolor{marrom}{RGB}{200,77,0}
@@ -45,91 +45,101 @@
 \definecolor{GreenTeal}{RGB}{148,255,48} %verde
 \definecolor{YellowFishEggs}{RGB}{255,252,48} %amarelo
 \definecolor{OrangeLampLight}{RGB}{255,193,48} %laranja
-\definecolor{white}{RGB}{255,255,255}
+\definecolor{PosterWhite}{RGB}{255,255,255}
 
-%%Define o caminho das figuras, válido somente para o comando \includegraphics
+%% Set image search path used by \includegraphics.
 \graphicspath{{Figures}}
 %********************************************************************
-%%Teoremas
+%% Theorem environments.
 \usepackage{theorem}
 \theorembodyfont{\normalfont\upshape}
-\newtheorem{ex}{Exemplo}
-\newenvironment{defn}[1][Defini\c{c}\~ao]{\textbf{#1:}\
-}%
+\newtheorem{example}{Example}
+\newtheorem{ex}{Example}
+\newenvironment{definition}[1][Definition]{\textbf{#1:}\ }{}
+\newenvironment{defn}[1][Definition]{\textbf{#1:}\ }{}
 %********************************************************************
-%%Definindo de novos comandos
+%% Custom helper commands.
 
-\newcommand{\tituloA}[1]{\emph{\large \textbf{\color{white}{#1}}}}
-\newcommand{\tituloB}[1]{\emph{\large \textbf{\color{laranja}{#1}}}}
+\newcommand{\titleA}[1]{\emph{\large \textbf{\color{PosterWhite}{#1}}}}
+\newcommand{\titleB}[1]{\emph{\large \textbf{\color{laranja}{#1}}}}
+\let\tituloA\titleA
+\let\tituloB\titleB
 \newcommand{\R}{\mathbb{R}}
 
-%%Imagem de fundo (background)
-\newcommand{\imgfundo}[1]{
+%% Background image.
+\newcommand{\setBackgroundImage}[1]{
 \begin{tikzpicture}[remember picture,overlay]
   \tikzset{inner sep=0pt,outer sep=0pt}
-    %%Centralizado na página.
+    %% Centered on page.
     \node at (current page.center) {
-      \includegraphics[height=\paperheight]{#1} %%Figura da altura do papel.
+      \includegraphics[height=\paperheight]{#1} %% Figure with full paper height.
     };
 \end{tikzpicture}
 }
+\let\imgfundo\setBackgroundImage
 
-%%titulo feito com TikZ
+%% Poster header built with TikZ.
 \newdimen\altura
-\altura=12cm
-\newcommand{\titulo}[3]{
+\altura=13cm
+\newdimen\headerRightWhitePanelWidth
+\headerRightWhitePanelWidth=14.4cm
+\newdimen\headerBlueWhiteGap
+\headerBlueWhiteGap=3cm
+\newcommand{\posterHeader}[3]{
 \begin{tikzpicture}[remember picture,overlay]
 \node at (current page.north west){
   \begin{tikzpicture}[remember picture,overlay]
-      \draw[fill=#3] (-3cm,0) rectangle (\paperwidth,-\altura);
-      \node[right] at (-0.8cm,-.65*\altura) {
-	\includegraphics[height=8cm]{#1} %%primeiro logo
+  \draw[fill=#3] (-3cm,0) rectangle (\dimexpr\paperwidth-\headerRightWhitePanelWidth-\headerBlueWhiteGap\relax,-\altura);
+      \node[right] at (-0.8cm,-.60*\altura) {
+	\includegraphics[height=8cm]{#1} %% first logo
       };
   \end{tikzpicture}
 };
 \node at (current page.north east){
   \begin{tikzpicture}[remember picture,overlay]
-  \filldraw[white] (-14.4cm,0) rectangle (0,-1.01*\altura);
+  \filldraw[PosterWhite] (-\headerRightWhitePanelWidth,0) rectangle (0,-1.01*\altura);
       \node[left] at (-2.9cm,-.61*\altura) {
-	\includegraphics[height=7cm,width=11cm]{#2} %%segundo logo
+	\includegraphics[height=7cm,width=13cm]{#2} %% second logo
       };
-      \filldraw[laranja](-15.5cm,0) rectangle (-14.4cm,-\altura);
+      %\filldraw[laranja](-15.5cm,0) rectangle (-14.4cm,-\altura);
       
   \end{tikzpicture}
 };
 \node at (current page.north){
   \begin{tikzpicture}[remember picture,overlay,node distance=2mm]
-    \node[white] (n1) at (-1.5,-4) {\shortstack{\Large\textbf{\tituloposter}}};
-    \node[white] (n2) [below = of n1] {\shortstack{\Large\textbf{\titulogrande}}};
-    \node[white] (n3) [below = of n2] {\nome};
-    \node[white] (n4) [below = of n3] {\small{\instituicao}};
+    \node[PosterWhite] (n1) at (-1.5,-4) {\shortstack{\Large\textbf{\posterTitle}}};
+    \node[PosterWhite] (n2) [below = of n1] {\shortstack{\Large\textbf{\posterSubtitle}}};
+    \node[PosterWhite] (n3) [below = of n2] {\authorNames};
+    \node[PosterWhite] (n4) [below = of n3] {\small{\institutionName}};
   \end{tikzpicture}
 };
 \end{tikzpicture}
 }
+\let\titulo\posterHeader
 
-%%Nome do congresso feito com TikZ
-\newcommand{\congresso}[1]{
+%% Conference banner built with TikZ.
+\newcommand{\conferenceBanner}[1]{
 \begin{tikzpicture}[remember picture,overlay]
 \node at (current page.north){
   \begin{tikzpicture}[remember picture,overlay]
      \draw[fill=#1] (-.5*\textwidth-2cm,-13.25) rectangle (.5*\textwidth-2cm,-14.75);
-     \node[white] at (-2cm,-14) {\Large{
+    \node[PosterWhite] at (-2cm,-14) {\Large{
 	\nomecongresso \qquad --- \qquad \textbf{\abrev}
       }};
   \end{tikzpicture}
 };
 \end{tikzpicture}
 }
+\let\congresso\conferenceBanner
 
-%%rodape feito com TikZ
-\newcommand{\rodape}[3]{
+%% Footer built with TikZ.
+\newcommand{\posterFooter}[3]{
 \begin{tikzpicture}[remember picture,overlay]
 \node at (current page.south west){
   \begin{tikzpicture}[remember picture,overlay,inner sep=0,outer sep=0]
       \draw[fill=#3] (0,0) rectangle (\paperwidth,5);
       \node[above right] at (4cm,1) {
-	\includegraphics[height=3cm]{#1} %%terceiro logo
+	\includegraphics[height=3cm]{#1} %% third logo
       };
   \end{tikzpicture}
 };
@@ -137,9 +147,10 @@
 \node at (current page.south east){
   \begin{tikzpicture}[remember picture,overlay,inner sep=0,outer sep=0]
       \node[above left] at (-4cm,1) {
-	\includegraphics[height=3cm]{#2} %%quarto logo
+	\includegraphics[height=3cm]{#2} %% fourth logo
       };
   \end{tikzpicture}
 };
 \end{tikzpicture}
 }
+\let\rodape\posterFooter
