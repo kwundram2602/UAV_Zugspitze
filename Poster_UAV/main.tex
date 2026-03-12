@@ -1,8 +1,9 @@
 %% Poster template with TikZ figures.
 \documentclass[36pt]{sciposter}
 \usepackage{preposterTikz} % package with poster preamble.
-\geometry{paperwidth=90cm,paperheight=100cm,centering,
-    textwidth=85cm,textheight=94cm,left=0cm,top=2cm}
+\geometry{paperwidth=84.1cm,paperheight=118.9cm,centering,
+    textwidth=79cm,textheight=112cm,top=2cm}
+\AtBeginDocument{\setlength{\hoffset}{0pt}}  % sciposter sets \hoffset=2.5cm; reset so centering works
 \pgfplotsset{compat=1.18}
 %********************************************************************
 %********************************************************************
@@ -25,16 +26,17 @@
 
 %% Header built with TikZ.
 \posterHeader{Figures/Logos/eagle_master_full_noText_bw_white-e1463595440895.png}{Figures/Logos/uni-wuerzburg-logo.png}{BoxCol}
-\vspace{5cm} % spacing
+\vspace{5cm} % spacing below header
 \input{Sections/Summary.tex}
-%% Text in two columns.
+%% Two-column layout.
 \begin{multicols}{2}
-%% Paragraph formatting.
+\raggedcolumns
 \setlength{\parindent}{3em}
 \input{Sections/Objectives}
 \input{Sections/Methodology}
-\input{Sections/Results}
 \input{Sections/Conclusions}
+\columnbreak
+\input{Sections/Results}
 \input{Sections/References}
 \end{multicols}
 \end{document}

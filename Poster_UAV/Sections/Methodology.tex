@@ -1,16 +1,8 @@
 \section*{\titleA{METHODOLOGY}}
 
-%\begin{enumerate}
-%	\begin{equation}
-%		DSM_{snow depth} = DSM_{winter} - DSM_{summer}
-%	\end{equation}
-%	\item Calculate indices with whitebox tools
-%	\item Create chunks of the study area
-%	\item Train and optimize a HistGradientBoostingRegressor
-%s\end{enumerate}
-\begin{figure}[h]
-	\begin{center}
-		\includegraphics[width=0.8\columnwidth]{Figures/workflow_diagram.png}
-		\caption{A flowchart visualising the workflow.}
-	\end{center}
-\end{figure}
+\noindent\centering
+\includegraphics[width=0.9\linewidth, height=0.40\textheight, keepaspectratio]{Figures/workflow_diagram.png}
+\captionof{figure}{Processing pipeline: (1)~DSM differencing ($\mathrm{SDM} =
+\mathrm{DSM_{winter}} - \mathrm{DSM_{summer}}$); (2)~Whitebox indices ;
+(3)~Stratified sampling and HGBR, repeated for 16 spatial chunks.}
+\par

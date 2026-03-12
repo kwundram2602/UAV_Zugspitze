@@ -13,6 +13,7 @@
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{setspace}
+\usepackage{capt-of}
 
 \usetikzlibrary{positioning}
 \usetikzlibrary{arrows.meta}
@@ -90,7 +91,7 @@
 \node at (current page.north west){
   \begin{tikzpicture}[remember picture,overlay]
   \draw[fill=#3] (-3cm,0) rectangle (\dimexpr\paperwidth-\headerRightWhitePanelWidth-\headerBlueWhiteGap\relax,-\altura);
-      \node[right] at (-0.8cm,-.60*\altura) {
+      \node[right] at (1.5cm,-.60*\altura) {
 	\includegraphics[height=8cm]{#1} %% first logo
       };
   \end{tikzpicture}

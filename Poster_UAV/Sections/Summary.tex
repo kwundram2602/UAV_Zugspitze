@@ -1,3 +1,6 @@
 \section*{\titleA{SUMMARY}}
 
-To derive the snow depth in the study area, we created a snow depth model based on the latest available DSM from winter and summer. Various indices were then calculated. These included slope, aspect, topographic positional index, windward index and directional relief based on the main wind directions. Furthermore, the study area was divided into multiple sections to gain more specific spatial insights. All features were then used to train a histogram gradient boosting algorithm for further prediction.
+UAV surveys at the Zugspitze provided multi-temporal DSMs at 10\,cm resolution.
+A snow depth model was derived by subtracting a snow-free summer DSM (Aug~2025) from a winter
+DSM (Jan~2026). Several topographic indices were computed and used to train a Histogram Gradient
+Boosting Regressor (HGBR), applied both globally and within spatial subsets (chunks).
