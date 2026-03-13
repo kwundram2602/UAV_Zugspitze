@@ -2,15 +2,18 @@
 
 \vspace{1cm}
 \noindent
-\begin{minipage}[t]{0.48\linewidth}
+\begin{minipage}[t]{0.9\linewidth}
   \centering
-  \includegraphics[width=\linewidth, height=0.26\textheight, keepaspectratio]{Figures/analysis_hbbr_new/global_analysis.pdf}
-\end{minipage}
-\hfill
-\begin{minipage}[t]{0.48\linewidth}
-  \centering
-  \includegraphics[width=\linewidth, height=0.26\textheight, keepaspectratio]{Figures/analysis_hbbr_new/chunks/chunk_00/chunk_00_analysis.pdf}
+  \includegraphics[width=\linewidth, height=0.4\textheight, keepaspectratio]{Figures/analysis_hbbr_new/global_analysis.pdf}
 \end{minipage}
 \captionof{figure}{Feature importances and predicted vs.\ observed snow depth:
-global model (left) and Chunk\,00 as a representative subset (right).
+global model (top) and chunk-wise feature-importance overview (bottom).
 TPI\,250\,px dominates globally; local models show varying feature hierarchies.}
+
+\vspace{0.6cm}
+\noindent
+\begin{minipage}[t]{0.9\linewidth}
+  \centering
+  \includegraphics[width=\linewidth, height=0.28\textheight, keepaspectratio]{Figures/analysis_hbbr_new/chunks/chunk_feat_importance_overview.pdf}
+\end{minipage}
+\captionof{figure}{Chunk-wise feature importance overview: TPI at 25\,m scale is the most influential predictor for most chunks. Only 12 chunks were used since some had too few samples for training.}
