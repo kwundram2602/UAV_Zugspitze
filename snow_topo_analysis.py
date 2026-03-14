@@ -38,12 +38,27 @@ import matplotlib
 matplotlib.use("Agg")           # headless; change to "TkAgg" if you want a window
 import matplotlib.pyplot as plt
 
+matplotlib.rcParams.update({
+    "font.size":        20,   # body / tick labels → 20 pt at print size
+    "axes.titlesize":   23,
+    "axes.labelsize":   20,
+    "xtick.labelsize":  18,
+    "ytick.labelsize":  18,
+    "legend.fontsize":  18,
+    "figure.titlesize": 25,
+})
+
 from shapely.geometry import box
 from sklearn.ensemble import RandomForestRegressor, HistGradientBoostingRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.inspection import PartialDependenceDisplay,permutation_importance
 from pathlib import Path
+
+# ─── Poster dimensions (from LaTeX \geometry) ─────────────────────────────────
+# textwidth=79cm, textheight=112cm  →  figures sized to these = 20 pt body text
+TW = 79  / 2.54   # 31.10 in  (full text width)
+TH = 112 / 2.54   # 44.09 in  (full text height)
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 HERE        = Path(__file__).resolve().parent
@@ -63,7 +78,7 @@ DIR_RELIEF_DIRECTIONS = ["E", "SE", "SW", "W"]
 # Model to use: "rf" (RandomForestRegressor) or "hgbr" (HistGradientBoostingRegressor)
 MODEL_TYPE = "hgbr"
 
-# Colormap for the predicted-vs-observed hexbin in analysis.png
+# Colormap for the predicted-vs-observed hexbin in analysis.svg
 # Any matplotlib colormap name works, e.g. "Blues", "YlOrRd", "plasma", "viridis"
 SCATTER_CMAP = "Blues"
 
@@ -75,7 +90,7 @@ RANDOM_SEED = 42
 RUN_CHUNK_EXPERIMENT = True
 CHUNK_ROWS = 4
 CHUNK_COLS = 4
-MIN_CHUNK_SAMPLES = 300_000
+MIN_CHUNK_SAMPLES = 200_000
 
 # Snow depth filter (remove outliers / artefacts)
 SNOW_MIN_M = 0.04   # below this → likely measurement noise, excluded
@@ -279,9 +294,9 @@ def make_model_plots(
     Generate and save the three standard diagnostic plots for one model.
 
     Plots produced (all written to *out_dir*):
-      • <label>_analysis.png      – feature importances + predicted vs observed
-      • <label>_scatter.png       – hexbin snow depth vs each predictor
-      • <label>_partial_dep.png   – partial dependence plots
+      • <label>_analysis.svg      – feature importances + predicted vs observed
+      • <label>_scatter.svg       – hexbin snow depth vs each predictor
+      • <label>_partial_dep.svg   – partial dependence plots
 
     Parameters
     ----------
@@ -320,12 +335,11 @@ def make_model_plots(
         imp_title  = "HGBR Feature Importances\n(permutation, mean ± std)"
 
     # ── (a) Feature importances + pred-vs-obs ─────────────────────────────────
-    fig, axes = plt.subplots(1, 2, figsize=(12, max(5, n_feat * 0.5 + 2)))
+    fig, axes = plt.subplots(1, 2, figsize=(TW, max(TW * 7/12, n_feat * TW * 0.5/12 + TW * 2/12)))
     fig.suptitle(
         f"Snow Depth vs. Topographic Parameters – {label}\n"
         f"Summer DSM: 2025-08-20  |  Winter DSM: 2026-01-17  |  "
         f"n = {n_sample_total:,} pixels",
-        fontsize=12,
     )
 
     ax = axes[0]
@@ -338,31 +352,31 @@ def make_model_plots(
     ax = axes[1]
     hb = ax.hexbin(y_test, y_pred, gridsize=60, cmap=scatter_cmap, mincnt=1)
     cb = fig.colorbar(hb, ax=ax)
-    cb.set_label("n pixels", fontsize=9)
+    cb.set_label("n pixels")
     lim = [0, max(y_test.max(), y_pred.max())]
     ax.plot(lim, lim, "r--", lw=1.2, label="1:1 line")
     ax.set_title(f"{model_name}: Predicted vs Observed\nR² = {r2:.3f}  RMSE = {rmse:.3f} m")
     ax.set_xlabel("Observed snow depth (m)")
     ax.set_ylabel("Predicted snow depth (m)")
-    ax.legend(fontsize=8)
+    ax.legend()
 
     plt.tight_layout()
-    path_a = os.path.join(out_dir, f"{label}_analysis.png")
-    plt.savefig(path_a, dpi=150, bbox_inches="tight")
+    path_a = os.path.join(out_dir, f"{label}_analysis.svg")
+    plt.savefig(path_a, bbox_inches="tight")
     plt.close()
     print(f"    Model summary plot  → {path_a}")
 
     # ── (b) Hexbin scatter: snow depth vs each predictor ──────────────────────
     n_plot_cols = 4
     n_plot_rows = int(np.ceil(n_feat / n_plot_cols))
+    cell_w = TW / n_plot_cols
     fig2, axes2 = plt.subplots(
         n_plot_rows, n_plot_cols,
-        figsize=(n_plot_cols * 4, n_plot_rows * 3.5),
+        figsize=(TW, n_plot_rows * cell_w * 3.5 / 4),
     )
     axes2_flat = axes2.ravel() if n_feat > 1 else [axes2]
     fig2.suptitle(
         f"Snow Depth vs. Individual Topographic Predictors – {label}",
-        fontsize=12,
     )
 
     for i, feat in enumerate(FEATURES):
@@ -372,28 +386,27 @@ def make_model_plots(
             gridsize=50, cmap="viridis", mincnt=1,
         )
         plt.colorbar(hb, ax=ax, label="n pixels")
-        ax.set_xlabel(FEATURE_LABELS[feat], fontsize=9)
-        ax.set_ylabel("Snow depth (m)", fontsize=9)
-        ax.set_title(FEATURE_LABELS[feat], fontsize=9)
+        ax.set_xlabel(FEATURE_LABELS[feat])
+        ax.set_ylabel("Snow depth (m)")
+        ax.set_title(FEATURE_LABELS[feat])
 
     for j in range(n_feat, len(axes2_flat)):
         axes2_flat[j].set_visible(False)
 
     plt.tight_layout()
-    path_b = os.path.join(out_dir, f"{label}_scatter.png")
-    plt.savefig(path_b, dpi=150, bbox_inches="tight")
+    path_b = os.path.join(out_dir, f"{label}_scatter.svg")
+    plt.savefig(path_b, bbox_inches="tight")
     plt.close()
     print(f"    Scatter grid        → {path_b}")
 
     # ── (c) Partial dependence plots ──────────────────────────────────────────
     fig3, axes3 = plt.subplots(
         n_plot_rows, n_plot_cols,
-        figsize=(n_plot_cols * 4, n_plot_rows * 3.5),
+        figsize=(TW, n_plot_rows * cell_w * 3.5 / 4),
     )
     axes3_flat = axes3.ravel() if n_feat > 1 else [axes3]
     fig3.suptitle(
         f"Partial Dependence Plots – {model_name}  (R²={r2:.3f})  – {label}",
-        fontsize=12,
     )
 
     PartialDependenceDisplay.from_estimator(
@@ -406,10 +419,65 @@ def make_model_plots(
         axes3_flat[j].set_visible(False)
 
     plt.tight_layout()
-    path_c = os.path.join(out_dir, f"{label}_partial_dep.png")
-    plt.savefig(path_c, dpi=150, bbox_inches="tight")
+    path_c = os.path.join(out_dir, f"{label}_partial_dep.svg")
+    plt.savefig(path_c, bbox_inches="tight")
     plt.close()
     print(f"    Partial dependence  → {path_c}")
+
+    return imp_values
+
+
+def plot_chunk_importance_overview(
+    chunk_importances: list,
+    FEATURES: list[str],
+    feat_labels: list[str],
+    out_path: str,
+):
+    """Grouped bar chart: per feature, count of chunks where it ranked #1 or #2."""
+    if not chunk_importances:
+        print("  No chunk importances available for overview plot.")
+        return
+
+    rank1_counts = np.zeros(len(FEATURES), dtype=int)
+    rank2_counts = np.zeros(len(FEATURES), dtype=int)
+    for _, imp in chunk_importances:
+        sorted_idx = np.argsort(imp)[::-1]
+        rank1_counts[sorted_idx[0]] += 1
+        if len(sorted_idx) > 1:
+            rank2_counts[sorted_idx[1]] += 1
+
+    # Keep only features that appeared in the top 2 at least once
+    ever_top2 = (rank1_counts + rank2_counts) > 0
+    indices = np.where(ever_top2)[0]
+
+    # Sort by rank-1 count desc, then rank-2 count desc
+    indices = indices[np.lexsort((rank2_counts[indices], rank1_counts[indices]))[::-1]]
+
+    labels  = [feat_labels[i] for i in indices]
+    counts1 = rank1_counts[indices]
+    counts2 = rank2_counts[indices]
+
+    n = len(indices)
+    x = np.arange(n)
+    width = 0.4
+
+    fig, ax = plt.subplots(figsize=(min(TW, n * TW / 8), TH / 5))
+    ax.bar(x - width / 2, counts1, width, label="Rank #1", color="#2196F3")
+    ax.bar(x + width / 2, counts2, width, label="Rank #2", color="#90CAF9")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha="right")
+    ax.set_ylabel("Number of chunks")
+    ax.set_title(
+        f"Feature Importance Overview across {len(chunk_importances)} chunks\n"
+        "(features never in top 2 omitted)"
+    )
+    ax.yaxis.get_major_locator().set_params(integer=True)
+    ax.legend()
+    plt.tight_layout()
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path, bbox_inches="tight")
+    plt.close()
+    print(f"  Chunk importance overview → {out_path}")
 
 
 def main():
@@ -549,7 +617,7 @@ def main():
             print(f"    {feat:20s}: {imp:.4f}")
 
     # Global plots
-    make_model_plots(
+    global_imp_values = make_model_plots(
         label="global",
         out_dir=RESULTS_DIR,
         model=global_model,
@@ -566,12 +634,7 @@ def main():
         scatter_cmap=SCATTER_CMAP,
     )
 
-    # Global summary CSV — importance column computed inside make_model_plots already;
-    # here we store whatever is available (impurity for RF, NaN placeholder for HGBR)
-    if MODEL_TYPE == "rf":
-        imp_col = global_model.feature_importances_
-    else:
-        imp_col = [np.nan] * len(FEATURES)
+    imp_col = global_imp_values
 
     summary = pd.DataFrame({
         "feature"      : FEATURES,
@@ -594,6 +657,7 @@ def main():
         y_true_all = []
         y_pred_all = []
         chunk_rows = []
+        chunk_importances = []   # (chunk_id, imp_array) for processed chunks
 
         for chunk_id, g in df_sample.groupby("chunk_id"):
             n_chunk = len(g)
@@ -629,7 +693,7 @@ def main():
 
             # Per-chunk plots in own subdirectory
             chunk_plot_dir = os.path.join(chunks_out_dir, f"chunk_{int(chunk_id):02d}")
-            make_model_plots(
+            chunk_imp_col = make_model_plots(
                 label=f"chunk_{int(chunk_id):02d}",
                 out_dir=chunk_plot_dir,
                 model=chunk_model,
@@ -646,12 +710,6 @@ def main():
                 scatter_cmap=SCATTER_CMAP,
             )
 
-            # Per-chunk feature importance CSV
-            if MODEL_TYPE == "rf":
-                chunk_imp_col = chunk_model.feature_importances_
-            else:
-                chunk_imp_col = [np.nan] * len(FEATURES)
-
             chunk_imp = pd.DataFrame({
                 "feature"      : FEATURES,
                 "feature_label": feat_labels,
@@ -662,6 +720,7 @@ def main():
                 index=False,
             )
 
+            chunk_importances.append((int(chunk_id), chunk_imp_col))
             y_true_all.append(yc_test)
             y_pred_all.append(y_chunk_pred)
             chunk_rows.append({
@@ -677,6 +736,10 @@ def main():
         chunk_summary_path = os.path.join(RESULTS_DIR, "snow_topo_chunk_summary.csv")
         chunk_summary.to_csv(chunk_summary_path, index=False)
         print(f"\n  Chunk summary saved → {chunk_summary_path}")
+
+        # Overview: how often is each feature ranked #1 across chunks?
+        overview_path = os.path.join(chunks_out_dir, "chunk_feat_importance_overview.svg")
+        plot_chunk_importance_overview(chunk_importances, FEATURES, feat_labels, overview_path)
 
         # Annotate GeoPackage with chunk metrics
         try:

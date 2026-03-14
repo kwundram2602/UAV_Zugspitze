@@ -1,8 +1,9 @@
-%%poster03.tex com figuras em TikZ
-\documentclass[36pt]{sciposter}
-\usepackage{preposterTikz} %pacote com o preambulo.
-\geometry{paperwidth=90cm,paperheight=100cm,centering,
-    textwidth=85cm,textheight=94cm,left=0cm,top=2cm}
+%% Poster template with TikZ figures.
+\documentclass[30pt]{sciposter}
+\usepackage{preposterTikz} % package with poster preamble.
+\geometry{paperwidth=84.1cm,paperheight=118.9cm,centering,
+    textwidth=79cm,textheight=112cm,top=2cm}
+\AtBeginDocument{\setlength{\hoffset}{0pt}}  % sciposter sets \hoffset=2.5cm; reset so centering works
 \pgfplotsset{compat=1.18}
 %********************************************************************
 %********************************************************************
@@ -10,24 +11,30 @@
 
 \onehalfspacing
 
-%%Preencha os comandos abaixo com seus dados.
-\newcommand{\tituloposter}{Topographic Controls on Alpine Snow Depth:}%%titulo do poster
-\newcommand{\titulogrande}{UAV Multi-Temporal DSM Analysis and Machine Learning at Zugspitze} %%Preencha DENTRO DO parentese apenas se o título nao couber em uma linha.
-%%ATENÇAO: Se nao for usar a segunda linha, apenas nao escreva nada entre "{}".
-\newcommand{\nome}{Andersch$^{(a)}$, Elias, Wundram$^{(a)}$, Kjell} %%seu nome
-\newcommand{\instituicao}{$(a)$ Applied Earth Observation, University of Würzburg} %%instituição
+%% Fill in the commands below with your project data.
+\newcommand{\posterTitle}{Topographic Controls on Alpine Snow Depth:} % main poster title
+\newcommand{\posterSubtitle}{Multi-Temporal UAV Data Analysis Using Machine Learning } % Use only if a second line is needed.
+% If no subtitle is needed, keep the braces empty: {}.
+\newcommand{\authorNames}{Andersch$^{(a)}$, Elias, Wundram$^{(a)}$, Kjell} % author names
+\newcommand{\institutionName}{$(a)$ Applied Earth Observation, University of Würzburg} % affiliation
 
-%%titulo feito com TikZ (usando \newcommand).
-\titulo{Figures/Logos/eagle_master_full_noText_bw_white-e1463595440895.png}{Figures/Logos/uni-wuerzburg-logo.png}{BoxCol} %azul
-%Coloque o logo do SIICUSP no lugar do quadrado branco
-\vspace{4cm} %espa\c{c}o
+% Backward-compatible aliases.
+\let\tituloposter\posterTitle
+\let\titulogrande\posterSubtitle
+\let\nome\authorNames
+\let\instituicao\institutionName
+
+%% Header built with TikZ.
+\posterHeader{Figures/Logos/eagle_master_full_noText_bw_white-e1463595440895.png}{Figures/Logos/uni-wuerzburg-logo.png}{BoxCol}
+\vspace{5cm} % spacing below header
 \input{Sections/Summary.tex}
-%%Texto em 2 colunas
+%% Two-column layout.
 \begin{multicols}{2}
-%%Paragrafo.
+\raggedcolumns
 \setlength{\parindent}{3em}
 \input{Sections/Objectives}
 \input{Sections/Methodology}
+\columnbreak
 \input{Sections/Results}
 \input{Sections/Conclusions}
 \input{Sections/References}

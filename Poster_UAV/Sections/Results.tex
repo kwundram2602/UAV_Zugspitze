@@ -1,22 +1,19 @@
-\section*{\tituloA{RESULTS}}
+\section*{\titleA{RESULTS}}
 
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=0.8\columnwidth]{Figures/SDM_map.pdf}
-\caption{Spatial distribution of snow depth modelled across the Zugspitze study area.}
-\end{center}
-\end{figure}
+\vspace{1cm}
+\noindent
+\begin{minipage}[t]{0.9\linewidth}
+  \centering
+  \includegraphics[width=\linewidth, height=0.4\textheight, keepaspectratio]{Figures/analysis_hbbr_new/global_analysis.pdf}
+\end{minipage}
+\captionof{figure}{Feature importances and predicted vs.\ observed snow depth:
+global model (top) and chunk-wise feature-importance overview (bottom).
+TPI\,250\,px dominates globally; local models show varying feature hierarchies.}
 
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=0.8\columnwidth]{Figures/analysis_hgbr/global_analysis.png}
-\caption{HGBR global model analysis: feature importances and model performance across the full study area.}
-\end{center}
-\end{figure}
-
-\begin{figure}[h]
-\begin{center}
-\includegraphics[width=0.8\columnwidth]{Figures/analysis_hgbr/chunks/chunk_00/chunk_00_analysis.png}
-\caption{HGBR chunk-level analysis (Chunk 00): feature importances and model performance for a representative spatial subset.}
-\end{center}
-\end{figure}
+\vspace{0.6cm}
+\noindent
+\begin{minipage}[t]{0.9\linewidth}
+  \centering
+  \includegraphics[width=\linewidth, height=0.28\textheight, keepaspectratio]{Figures/analysis_hbbr_new/chunks/chunk_feat_importance_overview.pdf}
+\end{minipage}
+\captionof{figure}{Chunk-wise feature importance overview: TPI at 25\,m scale is the most influential predictor for most chunks. Only 12 chunks were used since some had too few samples for training.}
