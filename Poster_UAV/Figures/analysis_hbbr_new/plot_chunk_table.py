@@ -38,6 +38,7 @@ n_skip  = (df["status"] != "ok").sum()
 df_ok   = df[df["status"] == "ok"].copy()
 df_ok["chunk_id"] = df_ok["chunk_id"].astype(int)
 df_ok   = df_ok.sort_values("chunk_id").reset_index(drop=True)
+df_all  = df_ok.copy()   # all ok chunks for mean row
 df_ok   = df_ok.head(4)
 
 # ── build per-chunk data ─────────────────────────────────────────────────────
@@ -66,8 +67,18 @@ for _, row in df_ok.iterrows():
         "feats":  feats,
     })
 
+# ── mean row (all ok chunks) ─────────────────────────────────────────────────
+mean_rec = {
+    "cid":   None,
+    "n":     None,
+    "r2":    df_all["r2"].mean(),
+    "mae":   df_all["mae"].mean(),
+    "rmse":  df_all["rmse"].mean(),
+    "feats": [],
+}
+
 # ── figure layout ────────────────────────────────────────────────────────────
-n_rows = len(records)
+n_rows = len(records) + 1   # +1 for mean row
 ROW_H  = 1.26      # inches per data row
 HDR_H  = 0.963     # header row height
 FIG_W  = 13.0
@@ -244,6 +255,28 @@ for ri, rec in enumerate(records):
                     f"{feat['imp']:.2f}",
                     ha="left", va="center", fontsize=11,
                     color="#555555", transform=ax.transAxes, zorder=3)
+
+# ── mean row ─────────────────────────────────────────────────────────────────
+mean_ri = len(records) + 1
+rb = row_bottom(mean_ri)
+rh = row_height_ax(mean_ri)
+add_rect(MARGIN_L, rb, AVAIL_W, rh, "#1b3f6e", zorder=2)   # dark header colour
+
+def mean_txt(ci, text, align=None):
+    al = align or COLS[ci][3]
+    cx = col_x(ci)
+    cw_ = col_w(ci)
+    pad = 0.008
+    tx = cx + pad if al == "left" else cx + cw_ - pad if al == "right" else cx + cw_ / 2
+    ax.text(tx, rb + rh / 2, text,
+            ha=al, va="center", fontsize=14, fontweight="bold",
+            color=C_WHITE, transform=ax.transAxes, zorder=4)
+
+mean_txt(0, f"Mean", align="center")
+mean_txt(1, f"n\u202f=\u202f{len(df_all)}", align="center")   # n = 11
+mean_txt(2, f"{mean_rec['r2']:.2f}", align="center")
+mean_txt(3, f"{mean_rec['mae']:.2f}")
+mean_txt(4, f"{mean_rec['rmse']:.2f}")
 
 # ── outer border ─────────────────────────────────────────────────────────────
 top_y  = row_bottom(0) + row_height_ax(0)
