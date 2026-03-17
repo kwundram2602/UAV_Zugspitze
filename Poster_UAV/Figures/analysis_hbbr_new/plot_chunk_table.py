@@ -53,7 +53,7 @@ for _, row in df_ok.iterrows():
         imp_max = fdf["importance"].max()
         for rank, (_, fr) in enumerate(top.iterrows()):
             feats.append({
-                "label": fr["feature_label"],
+                "label": fr["feature_label"].replace("TPI", "RTP"),
                 "imp":   fr["importance"],
                 "rel":   fr["importance"] / imp_max,   # relative to chunk max
                 "rank":  rank,
