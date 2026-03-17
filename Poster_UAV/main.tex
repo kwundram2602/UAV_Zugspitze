@@ -1,11 +1,12 @@
 %% Poster template with TikZ figures.
-\documentclass[30pt]{sciposter}
+\documentclass[a0,30pt]{sciposter}
+
 \usepackage{preposterTikz} % package with poster preamble.
 \geometry{paperwidth=84.1cm,paperheight=118.9cm,centering,
-    textwidth=79cm,textheight=112cm,top=2cm}
+    textwidth=80cm,textheight=115cm,top=2cm}
 \AtBeginDocument{\setlength{\hoffset}{0pt}}  % sciposter sets \hoffset=2.5cm; reset so centering works
 \pgfplotsset{compat=1.18}
-\usepackage[backend=biber, style=authoryear, maxnames=1]{biblatex}
+\usepackage[backend=biber, style=numeric, maxnames=1]{biblatex}
 \addbibresource{library.bib}
 \renewcommand*{\bibfont}{\scriptsize}
 \usepackage{ragged2e}
