@@ -5,10 +5,18 @@
 \par\vspace{0.8cm}
 \captionof{figure}{Processing pipeline: (1)~DSM differencing ($\mathrm{SDM} =
 \mathrm{DSM_{winter}} - \mathrm{DSM_{summer}}$); (2)~Whitebox indices ;
-(3)~Stratified sampling and HGBR, repeated for 16 spatial chunks.}
+(3)~Pixel sampling and HGBR, repeated for 12 (out of 16) spatial chunks.}
 \vspace{0.8cm}
 \par
-
+\centering
+\textbf{Whitebox predictor indices:}
+\begin{itemize}
+    \item Relative Topography Position (RTP)
+    \item Aspect, Slope $\rightarrow$ Windward Index (WI) \cite{Bhner2009LandSurfacePS}
+    \item Directional Relief (Dir.\ Relief)
+    \item Slope
+\end{itemize}
+\vspace{0.8cm}
 \includegraphics[width=0.85\linewidth, height=0.32\textheight, keepaspectratio]{Figures/SDM_map.pdf}
 \par\vspace{0.8cm}
 \captionof{figure}{Modelled snow depth across the Zugspitze study area (10\,cm resolution, Jan~2026) with the chunk grid used for local model training. Chunks with insufficient samples were excluded in the processing.}
